@@ -1,0 +1,183 @@
+# SmartAgent Configuration - Advanced Setup with All Customizations
+name: AdvancedSmartAgent
+version: 1.0
+description: "Production-grade AI agent with full customization stack"
+
+# === 1. MODEL PROVIDER ===
+# Supports: openai, anthropic, ollama, custom_function
+provider: "openai"
+model: "gpt-4-turbo"
+api_key: "${OPENAI_API_KEY}"
+base_url: ""  # Override default for self-hosted or proxy
+model_timeout_sec: 120
+model_max_retries: 5
+
+# Additional model-specific parameters passed to the provider
+model_kwargs:
+  frequency_penalty: 0.1
+  presence_penalty: 0.05
+
+# === 2. INPUT/OUTPUT FORMATS ===
+input_formats: ["text", "image", "video"]
+output_format: "markdown"         # text | json | markdown | html | latex
+
+# CUSTOMIZATION #1: Response Format Control
+max_response_length: 8000
+enable_streaming: true
+
+# === 3. MODEL BEHAVIOR (Generation Parameters) ===
+# CUSTOMIZATION #2-5: Fine-grained model control
+temperature: 0.85                 # 0 (deterministic) - 2 (creative)
+top_p: 0.95                       # Nucleus sampling threshold
+top_k: 40                         # Top-K sampling
+frequency_penalty: 0.1            # Penalize repeated tokens
+presence_penalty: 0.05            # Encourage new topics
+max_tokens: 3000
+stop_sequences: ["---END---", "### Stop"]
+
+# === 4. OUTPUT STYLE & TONE ===
+# CUSTOMIZATION #6-7: Communication style control
+language: "en"                    # Language code
+tone: "technical"                 # formal | casual | technical | friendly | academic
+verbose_level: 2                  # 0=terse, 1=balanced, 2=detailed, 3=exhaustive
+include_citations: true           # Include source references
+include_reasoning: true           # Show internal reasoning process
+
+# === 5. MEMORY & STORAGE ===
+# CUSTOMIZATION #8: Flexible memory backend
+memory_max_items: 500
+importance_threshold: 0.65
+
+# CUSTOMIZATION #9: Memory retention policy
+memory_retention_days: 90  # Auto-delete memories older than 90 days
+storage_backend: "sqlite"  # memory | sqlite | redis
+storage_path: "./agent_memory.db"
+enable_compression: true
+
+# === 6. MENTOR AI CONFIGURATION ===
+mentor_enabled: true
+
+# CUSTOMIZATION #10: Component interval control
+mentor_interval_sec: 3.0   # Run every 3 seconds for faster feedback
+
+mentor_feedback_focus: "all"  # quality | efficiency | completeness | all
+mentor_max_feedback_length: 800
+mentor_response_format: "json"
+mentor_system_prompt_suffix: |
+  You are reviewing technical solutions.
+  Focus on correctness, efficiency, and security best practices.
+  Rate components 1-10 for quality and efficiency.
+
+# === 7. DEEP THINKER AI CONFIGURATION ===
+deep_thinker_enabled: true
+
+# CUSTOMIZATION #11: Deep thinking parameters
+deep_thinker_max_iterations: 100    # Allow thorough problem solving
+verification_required: true
+persistence_enabled: true           # Continue after system restart
+deep_thinker_response_format: "markdown"
+deep_thinker_system_prompt_suffix: |
+  You are solving complex technical problems requiring deep analysis.
+  Use formal reasoning. Consider edge cases and optimization.
+  Provide complete proofs of correctness before concluding.
+
+# === 8. FAST MEMORY CONFIGURATION ===
+fast_memory_enabled: true
+
+# CUSTOMIZATION #12: Memory matching parameters
+fast_memory_threshold: 0.40          # Higher threshold = more precise matching
+fast_memory_max_hints: 5             # More hints for comprehensive context
+fast_memory_hint_format: "structured"  # inline | separate | structured
+
+# === 9. TOOLS & COMMAND EXECUTION ===
+# CUSTOMIZATION #13: Command security and scope
+enable_commands: true
+commands_optional: true
+max_command_hops: 3
+command_timeout_sec: 60
+
+# Whitelist of allowed functions (empty = all allowed)
+allowed_functions: []  # ["write_file", "execute_code", "search"]
+
+# === 10. RATE LIMITING & THROTTLING ===
+# CUSTOMIZATION #14: Traffic management
+requests_per_minute: 120
+requests_per_hour: 5000
+burst_allowed: 10
+enable_throttling: true
+
+# === 11. CACHING STRATEGY ===
+# CUSTOMIZATION #15: Response caching
+enable_caching: true
+cache_ttl_sec: 7200          # Cache responses for 2 hours
+cache_backend: "redis"        # memory | redis | disk
+cache_max_size_mb: 500
+
+# === 12. LOGGING & DIAGNOSTICS ===
+enable_logging: true
+log_level: "INFO"             # DEBUG | INFO | WARNING | ERROR
+log_file: "./agent.log"
+log_format: "structured"      # structured | text
+capture_all_inputs: true      # Log what users send
+capture_all_outputs: false    # Don't log model outputs (privacy)
+
+# === 13. CUSTOM SYSTEM PROMPTS ===
+# Immutable base prompts + custom suffixes per component
+system_prompts:
+  main_ai_suffix: |
+    You are AdvancedAgent, designed for complex technical problem-solving.
+    
+    Context:
+    - Your users are software engineers and researchers
+    - They value accuracy and depth over brevity
+    - They appreciate academic rigor and citations
+    
+    Behavior:
+    - Always cite sources when providing factual claims
+    - Explain your reasoning process
+    - Suggest edge cases and potential issues
+    - Provide code examples when relevant
+  
+  mentor_ai_suffix: |
+    You are the Quality Assurance AI for AdvancedAgent.
+    Your job is to review every response and provide constructive feedback.
+    
+    Evaluation Criteria:
+    - Technical Accuracy (correctness of facts and code)
+    - Completeness (does it address all parts of the question?)
+    - Clarity (is the explanation easy to follow?)
+    - Security (any potential security issues?)
+    
+    Format feedback as structured JSON with scores 1-10.
+  
+  deep_thinker_ai_suffix: |
+    You are the Research & Analysis AI.
+    You receive complex problems that need rigorous, thorough analysis.
+    
+    Process:
+    1. Break down the problem into components
+    2. Research each component thoroughly
+    3. Propose multiple solution approaches
+    4. Analyze pros/cons of each
+    5. Implement and verify the best solution
+    
+    Success = Verified, optimized solution with formal proof.
+  
+  fast_memory_ai_suffix: |
+    You are the Context Injector.
+    You match current topics to relevant past knowledge.
+    
+    When finding matches:
+    - Return the 5 most relevant past learnings
+    - Include confidence scores
+    - Explain why they're relevant to the current topic
+
+# === 14. ADVANCED: PER-COMPONENT CUSTOMIZATION ===
+# Override defaults per component
+mentor_timeout_sec: 15
+deep_thinker_timeout_sec: 45
+fast_memory_timeout_sec: 5
+
+# === 15. EXPERIMENTAL FEATURES ===
+enable_streaming: true
+enable_compression: true

@@ -1,0 +1,51 @@
+Metadata-Version: 2.4
+Name: smart-agent-arch
+Version: 0.1.0
+Summary: A neutral Python library scaffold with extensible architecture primitives.
+Author: NexLab
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+
+# smart-agent-arch
+
+Base scaffold for a Python library project.
+
+This repository now contains a neutral foundation for building your own architecture,
+without forcing domain logic in the initial template.
+
+## What is included
+
+- Clean package structure under `src/`
+- Public API entrypoint in `smart_agent_arch.__init__`
+- Project config via `pyproject.toml`
+- Version, config, exceptions, and extension registry primitives
+- Lifecycle hook interface for future architecture layers
+- Minimal tests with `pytest`
+
+## Quick start
+
+```bash
+pip install -e .[dev]
+pytest
+```
+
+## Example
+
+```python
+from smart_agent_arch import ExtensionRegistry, LibraryConfig
+
+config = LibraryConfig(project_name="nexlab-lib", debug=True)
+registry = ExtensionRegistry()
+
+registry.register("normalizer", lambda text: text.strip().lower())
+normalize = registry.get("normalizer")
+
+print(config.project_name)
+print(normalize("  Hello  "))
+```
+
+## Next step
+
+Add your real domain architecture on top of this base (modules, protocols, adapters, runtime).

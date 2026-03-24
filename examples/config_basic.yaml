@@ -1,0 +1,90 @@
+# SmartAgent Configuration Example - Basic Setup
+name: MySmartAgent
+version: 1.0
+description: "Compact AI agent with essential customizations"
+
+# === MODEL CONFIGURATION ===
+provider: "openai"
+model: "gpt-4-turbo"
+api_key: "${OPENAI_API_KEY}"  # Load from environment
+timeout_sec: 60
+
+# === INPUT/OUTPUT ===
+input_formats: ["text", "image"]
+output_format: "text"
+max_response_length: 4000
+enable_streaming: false
+
+# === MODEL BEHAVIOR (Generation Parameters) ===
+temperature: 0.7        # Randomness (0=deterministic, 2=very random)
+top_p: 0.9              # Nucleus sampling
+max_tokens: 2000        # Max response tokens
+stop_sequences: ["---"]
+
+# === OUTPUT STYLE ===
+language: "en"
+tone: "neutral"         # formal | casual | technical | friendly | academic
+verbose_level: 1        # 0=concise, 1=balanced, 2=detailed, 3=verbose
+include_citations: false
+include_reasoning: false
+
+# === MEMORY ===
+memory_max_items: 150
+importance_threshold: 0.65
+memory_retention_days: 30
+storage_backend: "memory"  # memory | sqlite | redis
+enable_compression: true
+
+# === COMPONENT CONFIGURATION ===
+mentor_enabled: true
+mentor_interval_sec: 5.0
+mentor_feedback_focus: "quality"  # quality | efficiency | completeness | all
+mentor_max_feedback_length: 500
+
+deep_thinker_enabled: true
+deep_thinker_max_iterations: 50
+verification_required: true
+persistence_enabled: true
+
+fast_memory_enabled: true
+fast_memory_threshold: 0.34
+fast_memory_max_hints: 3
+
+# === TOOLS & COMMANDS ===
+enable_commands: true
+commands_optional: true
+max_command_hops: 2
+command_timeout_sec: 30
+
+# === RATE LIMITING ===
+requests_per_minute: 60
+requests_per_hour: 1000
+burst_allowed: 5
+enable_throttling: false
+
+# === CACHING ===
+enable_caching: false
+cache_ttl_sec: 3600
+cache_backend: "memory"
+cache_max_size_mb: 100
+
+# === LOGGING ===
+enable_logging: true
+log_level: "INFO"      # DEBUG | INFO | WARNING | ERROR
+log_format: "structured"
+capture_all_inputs: false
+
+# === CUSTOM SYSTEM PROMPTS ===
+# These are ADDED to the immutable base prompts
+system_prompts:
+  main_ai_suffix: |
+    You are analyzing user queries for a software engineering context.
+    Be technical and precise. Assume the user has intermediate Python knowledge.
+  
+  mentor_ai_suffix: |
+    Focus on helping the main AI write better code and explanations.
+  
+  deep_thinker_ai_suffix: |
+    When solving complex algorithm problems, think about time complexity and space optimization.
+  
+  fast_memory_ai_suffix: ""
