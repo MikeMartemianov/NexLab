@@ -47,7 +47,7 @@ pip install -e .[dev]
 pytest
 ```
 
-## Configuration System (18+ Customizations)
+## Configuration System (21+ Customizations)
 
 SmartAgent supports extensive configuration through YAML, JSON, or Python modules.
 
@@ -71,7 +71,7 @@ ai = initialize_ai("config_custom.py")
 
 ### Configuration Customizations
 
-SmartAgent provides **18+ customization dimensions**:
+SmartAgent provides **21+ customization dimensions**:
 
 **1-2. Response Format** - Control output structure and length
 ```yaml
@@ -143,6 +143,17 @@ update_from_github()
 # Update everything from terminal:
 nexlab update
 ```
+
+**19. Event Hook System** - Subscribe to agent lifecycle events
+```python
+agent.register_hook(EventKind.ON_INPUT, my_callback)
+```
+
+**20-21. Diagnostics** - Advanced health checks and detailed logging
+```yaml
+detailed_diagnostics: true
+# Then run: nexlab doctor
+```
 ```
 
 ### System Prompts per Component
@@ -208,7 +219,7 @@ ai = initialize_ai("config_custom.py")
 
 ### Complete Example Configs
 
-See [CUSTOMIZATION_GUIDE.md](CUSTOMIZATION_GUIDE.md) for detailed documentation of all 18+ customizations, best practices, and troubleshooting guide.
+See [CUSTOMIZATION_GUIDE.md](CUSTOMIZATION_GUIDE.md) for detailed documentation of all 21+ customizations, best practices, and troubleshooting guide.
 
 Ready-to-use example configs in `examples/`:
 - `config_basic.yaml` - Essential customizations with OpenAI

@@ -17,6 +17,7 @@ from smart_agent_arch.long_memory import LongMemory
 from smart_agent_arch.mentor_ai import MentorAIComponent, MentorGateway, StubMentorGateway
 from smart_agent_arch.system_prompt_manager import SystemPromptManager
 from smart_agent_arch.tools_loader import ToolsLoader
+from smart_agent_arch.hooks import HookManager, EventKind
 
 MediaType = Literal["text", "image", "video", "audio"]
 
@@ -147,6 +148,10 @@ class UserAIFacade:
         self._worker_thread: threading.Thread | None = None
         self._lock = threading.Lock()
         
+        # Initialize Hooks
+        self._hooks = HookManager()
+        self._detailed_diagnostics = bool(config_dict.get("detailed_diagnostics", False))
+        
         # Initialize custom tools loader
         project_root = Path(__file__).resolve().parent.parent.parent
         self._tools_dir = project_root / "utils" / "custom_tools"
@@ -207,6 +212,10 @@ class UserAIFacade:
         self._mentor.start()
         self._deep_thinker.start()
 
+    def register_hook(self, kind: EventKind, callback: Callable) -> None:
+        """Register a custom hook for agent lifecycle events."""
+        self._hooks.register(kind, callback)
+
     @property
     def config(self) -> dict[str, Any]:
         return dict(self._config)
@@ -222,6 +231,7 @@ class UserAIFacade:
             payload=text,
             metadata=metadata or {},
         )
+        self._hooks.trigger(EventKind.ON_INPUT, {"envelope": envelope})
         response = self._send_with_command_pipeline(envelope)
         self._event_cache.add(kind="runtime", summary=f"Runtime status: {response.status}")
         return response
@@ -460,6 +470,7 @@ class UserAIFacade:
                 break
 
             command_result = self._command_parser.execute(match)
+            self._hooks.trigger(EventKind.ON_TOOL_END, {"command": match.spec.name, "result": command_result})
             self._event_cache.add(kind="command", summary=f"Executed command: {match.spec.name}")
             self._long_memory.add(
                 summary=f"Command {match.spec.name} executed successfully",

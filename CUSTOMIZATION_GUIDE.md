@@ -2,11 +2,11 @@
 
 ## Overview
 
-SmartAgent has been enhanced with **18 powerful customization dimensions** that control every aspect of agent behavior. Each customization is **optional and configurable** through YAML, JSON, or Python config files.
+SmartAgent has been enhanced with **21 powerful customization dimensions** that control every aspect of agent behavior. Each customization is **optional and configurable** through YAML, JSON, or Python config files.
 
 ---
 
-## The 18 Core Customizations
+## The 21 Core Customizations
 
 ### **1. Response Format Control** (`output_format`)
 Define how the AI structures its outputs.
@@ -342,6 +342,49 @@ nexlab update
 
 ---
 
+### **19. Event Hook System** (`register_hook`)
+Extend agent behavior by subscribing to lifecycle events.
+
+**Available Events:**
+- `ON_INPUT`: Triggered when text/image/video input is received.
+- `ON_TOOL_START`: Triggered before a tool execution.
+- `ON_TOOL_END`: Triggered after a tool returns a result.
+- `ON_RESPONSE`: Triggered when the final AI response is generated.
+- `ON_ERROR`: Triggered when an internal error occurs.
+
+**Example:**
+```python
+def my_logger(event_kind, payload):
+    print(f"Event: {event_kind}, Data: {payload}")
+
+agent.register_hook(EventKind.ON_INPUT, my_logger)
+```
+
+---
+
+### **20. Self-Diagnostic Mode** (`detailed_diagnostics`)
+Enable deep inspection of internal state and background components.
+
+**Configuration:**
+```yaml
+detailed_diagnostics: true
+```
+
+**Effect:** Enables more verbose event logging and detailed error reporting in the `EventCache`.
+
+---
+
+### **21. Professional CLI Tools** (`nexlab doctor`)
+Built-in tools for environment health and framework status.
+
+**Usage:**
+```bash
+nexlab doctor  # Check environment (Python, Git, Deps)
+nexlab status  # View registered tools and component states
+```
+
+---
+
 ## Advanced: Component-Specific Customizations
 
 ### **Main AI Customizations**
@@ -479,6 +522,8 @@ agent = UserAIFacade(config.to_dict())
 6. **Version your configs** - Track config changes with your code
 7. **Use system prompts for domain** - Custom suffixes for specialization
 8. **Tune temperature** - Critical for consistency vs creativity tradeoff
+9. **Use nexlab doctor** - Regularly check environment health during development
+10. **Leverage hooks** - Use the hook system for custom logging/analytics instead of modifying core library
 
 ---
 
