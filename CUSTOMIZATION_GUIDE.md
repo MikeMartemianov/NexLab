@@ -2,11 +2,11 @@
 
 ## Overview
 
-SmartAgent has been enhanced with **16 powerful customization dimensions** that control every aspect of agent behavior. Each customization is **optional and configurable** through YAML, JSON, or Python config files.
+SmartAgent has been enhanced with **17 powerful customization dimensions** that control every aspect of agent behavior. Each customization is **optional and configurable** through YAML, JSON, or Python config files.
 
 ---
 
-## The 16 Core Customizations
+## The 17 Core Customizations
 
 ### **1. Response Format Control** (`output_format`)
 Define how the AI structures its outputs.
@@ -308,6 +308,21 @@ max_command_hops: 1  # Allow AI to use tools and then respond
 - **Zero-config**: Just drop a `.py` file
 - **Auto-metadata**: Descriptions and arguments are extracted from docstrings
 - **Safety**: Functions must be explicitly decorated with `@export_tool`
+
+---
+
+### **17. Self-Update System** (`update_from_github`)
+Easily update the `smart-agent-arch` package to the latest version from GitHub.
+
+**How it works:**
+The system includes a pre-configured tool `update_from_github()` available in `utils/custom_tools/system_tools.py`. It performs a safely managed `git pull` from the main repository.
+
+**Key Features:**
+- **Preserves Customizations**: Does not overwrite your `utils/custom_tools/` or local config files.
+- **One-Command Update**: Can be triggered directly by the AI assistant.
+
+**Example Usage (via AI):**
+> "Please update yourself from GitHub."
 
 ---
 

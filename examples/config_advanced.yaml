@@ -187,3 +187,8 @@ enable_compression: true
 # The system scans this folder automatically on startup.
 # Requires enable_commands: true (see section 9).
 load_custom_tools: true
+
+# === 17. SELF-UPDATE SYSTEM ===
+# Update the package directly from GitHub while preserving user files.
+# Usage (via AI): "Please update the system from GitHub"
+enable_self_update: true
