@@ -4,19 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-agent-arch"
-version = "0.8.0"
-description = "A neutral Python library scaffold with extensible architecture primitives."
+version = "0.8.1"
+description = "NexLab AI Code Editor - Professional Agent Framework with CLI and Dynamic Tools."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
   { name = "NexLab" }
 ]
-dependencies = []
+dependencies = [
+  "rich>=13.0"
+]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0"
 ]
+
+[project.scripts]
+nexlab = "smart_agent_arch.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

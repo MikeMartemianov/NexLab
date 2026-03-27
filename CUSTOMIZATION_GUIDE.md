@@ -2,11 +2,11 @@
 
 ## Overview
 
-SmartAgent has been enhanced with **17 powerful customization dimensions** that control every aspect of agent behavior. Each customization is **optional and configurable** through YAML, JSON, or Python config files.
+SmartAgent has been enhanced with **18 powerful customization dimensions** that control every aspect of agent behavior. Each customization is **optional and configurable** through YAML, JSON, or Python config files.
 
 ---
 
-## The 17 Core Customizations
+## The 18 Core Customizations
 
 ### **1. Response Format Control** (`output_format`)
 Define how the AI structures its outputs.
@@ -323,6 +323,22 @@ The system includes a pre-configured tool `update_from_github()` available in `u
 
 **Example Usage (via AI):**
 > "Please update yourself from GitHub."
+
+---
+
+### **18. NexLab CLI** (`nexlab`)
+Maintain and update your agent from the command line.
+
+**How it works:**
+The package includes a console script `nexlab` that provides maintenance commands.
+
+**Commands:**
+- `nexlab update`: Fetches the latest code from GitHub and re-installs the package in editable mode.
+
+**Example Usage:**
+```bash
+nexlab update
+```
 
 ---
 
