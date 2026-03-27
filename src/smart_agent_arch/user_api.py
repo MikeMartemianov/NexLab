@@ -456,7 +456,9 @@ class UserAIFacade:
 
     def _send_with_command_pipeline(self, envelope: InputEnvelope) -> RuntimeResponse:
         context = self.runtime_context()
-        response = self._runtime.send(envelope, self._config, context)
+        # Use FullConfig if available to preserve function pointers
+        config_to_pass = self._full_config if self._full_config else self._config
+        response = self._runtime.send(envelope, config_to_pass, context)
 
         # The AI response is returned directly to user; parser is optional and can refine via follow-up hops.
         hops = 0

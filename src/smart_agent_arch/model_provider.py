@@ -55,10 +55,10 @@ class OpenAIProvider(ModelProvider):
         except ImportError:
             raise ConfigurationError("openai package not installed")
 
-        if not self.api_key:
+        if not self.api_key and "api.openai.com" in self.base_url:
             raise ConfigurationError("OpenAI API key not configured")
 
-        client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+        client = AsyncOpenAI(api_key=self.api_key or "dummy", base_url=self.base_url)
 
         messages = []
         if system_prompt:
@@ -88,10 +88,10 @@ class OpenAIProvider(ModelProvider):
         except ImportError:
             raise ConfigurationError("openai package not installed")
 
-        if not self.api_key:
+        if not self.api_key and "api.openai.com" in self.base_url:
             raise ConfigurationError("OpenAI API key not configured")
 
-        client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        client = OpenAI(api_key=self.api_key or "dummy", base_url=self.base_url)
 
         messages = []
         if system_prompt:
@@ -318,10 +318,16 @@ class ModelResolver:
                 if hasattr(module, func_name):
                     return CustomProvider(getattr(module, func_name), config)
             raise ConfigurationError(f"Failed to load custom provider '{func_name}' from {path}")
+        
+        if provider_name == "custom_function":
+            if config.model_provider_function:
+                return CustomProvider(config.model_provider_function, config)
+            raise ConfigurationError("provider='custom_function' specified but no function pointer provided in config")
+
         if provider_name not in ModelResolver.PROVIDERS:
             raise ConfigurationError(
                 f"Unknown provider: {provider_name}. "
-                f"Available: {list(ModelResolver.PROVIDERS.keys())}"
+                f"Available: {list(ModelResolver.PROVIDERS.keys()) + ['custom', 'custom_function']}"
             )
 
         provider_class = ModelResolver.PROVIDERS[provider_name]

@@ -17,10 +17,10 @@ class LiveRuntimeGateway:
     def send(
         self,
         envelope: InputEnvelope,
-        config: dict[str, Any],
+        config: dict[str, Any] | FullConfig,
         runtime_context: dict[str, Any],
     ) -> RuntimeResponse:
-        full_config = ConfigLoader.from_dict(config)
+        full_config = config if isinstance(config, FullConfig) else ConfigLoader.from_dict(config)
         provider = ModelResolver.resolve(full_config)
 
         system_prompt = str(runtime_context.get("system_prompt", ""))
