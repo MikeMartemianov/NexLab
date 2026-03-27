@@ -181,3 +181,9 @@ fast_memory_timeout_sec: 5
 # === 15. EXPERIMENTAL FEATURES ===
 enable_streaming: true
 enable_compression: true
+
+# === 16. DYNAMIC TOOL CREATION ===
+# Place tools in utils/custom_tools/*.py decorated with @export_tool
+# The system scans this folder automatically on startup.
+# Requires enable_commands: true (see section 9).
+load_custom_tools: true

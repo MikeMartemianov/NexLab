@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-agent-arch"
-version = "0.6.1"
+version = "0.7.0"
 description = "A neutral Python library scaffold with extensible architecture primitives."
 readme = "README.md"
 requires-python = ">=3.10"

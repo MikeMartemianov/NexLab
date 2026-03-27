@@ -2,11 +2,11 @@
 
 ## Overview
 
-SmartAgent has been enhanced with **15 powerful customization dimensions** that control every aspect of agent behavior. Each customization is **optional and configurable** through YAML, JSON, or Python config files.
+SmartAgent has been enhanced with **16 powerful customization dimensions** that control every aspect of agent behavior. Each customization is **optional and configurable** through YAML, JSON, or Python config files.
 
 ---
 
-## The 15 Core Customizations
+## The 16 Core Customizations
 
 ### **1. Response Format Control** (`output_format`)
 Define how the AI structures its outputs.
@@ -272,6 +272,42 @@ allowed_functions:
 - Empty list `[]` = all functions allowed
 - Populated list = only listed functions executable
 - `enabled: false` = no commands at all
+
+---
+
+### **16. Dynamic Tool Creation** (`utils/custom_tools`)
+Extend agent capabilities by writing simple Python functions.
+
+**How it works:**
+The system automatically scans `utils/custom_tools/*.py`. Any function decorated with `@export_tool` is automatically registered as a command.
+
+**Example Tool (`utils/custom_tools/my_tools.py`):**
+```python
+from smart_agent_arch.tools_loader import export_tool
+
+@export_tool
+def get_disk_usage(path: str) -> str:
+    """
+    Returns the disk usage for a specific path.
+    :param path: The directory path to check.
+    """
+    import shutil
+    total, used, free = shutil.disk_usage(path)
+    return f"Total: {total // (2**30)}GB, Used: {used // (2**30)}GB, Free: {free // (2**30)}GB"
+```
+
+**Configuration:**
+To use these tools, the command parser must be enabled:
+```yaml
+command_parser:
+  enabled: true
+max_command_hops: 1  # Allow AI to use tools and then respond
+```
+
+**Benefits:**
+- **Zero-config**: Just drop a `.py` file
+- **Auto-metadata**: Descriptions and arguments are extracted from docstrings
+- **Safety**: Functions must be explicitly decorated with `@export_tool`
 
 ---
 

@@ -47,7 +47,7 @@ pip install -e .[dev]
 pytest
 ```
 
-## Configuration System (15+ Customizations)
+## Configuration System (16+ Customizations)
 
 SmartAgent supports extensive configuration through YAML, JSON, or Python modules.
 
@@ -71,7 +71,7 @@ ai = initialize_ai("config_custom.py")
 
 ### Configuration Customizations
 
-SmartAgent provides **15+ customization dimensions**:
+SmartAgent provides **16+ customization dimensions**:
 
 **1-2. Response Format** - Control output structure and length
 ```yaml
@@ -124,6 +124,13 @@ enable_throttling: false
 enable_caching: true
 cache_ttl_sec: 3600
 cache_backend: "redis"         # memory | redis | disk
+```
+
+**16. Dynamic Tool Creation** - Add tools by dropping Python files
+```yaml
+# Place tools in utils/custom_tools/ decorated with @export_tool
+command_parser:
+  enabled: true
 ```
 
 ### System Prompts per Component
@@ -189,7 +196,7 @@ ai = initialize_ai("config_custom.py")
 
 ### Complete Example Configs
 
-See [CUSTOMIZATION_GUIDE.md](CUSTOMIZATION_GUIDE.md) for detailed documentation of all 15+ customizations, best practices, and troubleshooting guide.
+See [CUSTOMIZATION_GUIDE.md](CUSTOMIZATION_GUIDE.md) for detailed documentation of all 16+ customizations, best practices, and troubleshooting guide.
 
 Ready-to-use example configs in `examples/`:
 - `config_basic.yaml` - Essential customizations with OpenAI

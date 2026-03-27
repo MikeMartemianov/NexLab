@@ -36,6 +36,10 @@ storage_backend: "memory"  # memory | sqlite | redis
 enable_compression: true
 
 # === COMPONENT CONFIGURATION ===
+# 4. TOOLS (Optional)
+# To use dynamic tools from utils/custom_tools/, enable the parser:
+command_parser:
+  enabled: true
 mentor_enabled: true
 mentor_interval_sec: 5.0
 mentor_feedback_focus: "quality"  # quality | efficiency | completeness | all
