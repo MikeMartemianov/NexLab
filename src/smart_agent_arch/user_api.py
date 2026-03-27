@@ -16,6 +16,7 @@ from smart_agent_arch.fast_memory_assist import FastMemoryAssist
 from smart_agent_arch.long_memory import LongMemory
 from smart_agent_arch.mentor_ai import MentorAIComponent, MentorGateway, StubMentorGateway
 from smart_agent_arch.system_prompt_manager import SystemPromptManager
+from smart_agent_arch.tools_loader import ToolsLoader
 
 MediaType = Literal["text", "image", "video", "audio"]
 
@@ -145,6 +146,12 @@ class UserAIFacade:
         self._worker_stop_event = threading.Event()
         self._worker_thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        
+        # Initialize custom tools loader
+        project_root = Path(__file__).resolve().parent.parent.parent
+        self._tools_dir = project_root / "utils" / "custom_tools"
+        self._tools_loader = ToolsLoader(self._tools_dir)
+        self.refresh_custom_tools()
         
         # Initialize component gateways
         if mentor_gateway is None and full_config:
@@ -302,6 +309,17 @@ class UserAIFacade:
         self._assist_with_fast_memory(topic=task_text, source_component="third_ai")
         self._deep_thinker.submit_task(task_text=task_text, source=source)
         self._event_cache.add(kind="thinker", summary=f"Deep task assigned by {source}")
+
+    def refresh_custom_tools(self) -> int:
+        """Reload all tools from the custom tools directory."""
+        specs = self._tools_loader.load_all()
+        for spec in specs:
+            self._command_parser.add_command(spec)
+        
+        count = len(specs)
+        if count > 0:
+            self._event_cache.add(kind="system", summary=f"Loaded {count} custom tools from {self._tools_dir}")
+        return count
 
     def runtime_context(self) -> dict[str, Any]:
         """Returns current time plus compact event list for model-side context."""
