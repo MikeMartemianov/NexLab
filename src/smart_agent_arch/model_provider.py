@@ -14,7 +14,8 @@ def _sanitize_base_url(url: str | None) -> str | None:
         return url
     
     url = url.rstrip("/")
-    suffixes = ["/chat/completions", "/v1", "/api/chat"]
+    # We DO NOT strip /v1 because many providers (Cerebras, Groq, OpenAI) expect it in base_url
+    suffixes = ["/chat/completions", "/api/chat"]
     
     changed = True
     while changed:
