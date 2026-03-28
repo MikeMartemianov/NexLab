@@ -18,7 +18,7 @@ class TestConfigLoaderFromDict:
     def test_load_minimal_config(self) -> None:
         config = ConfigLoader.from_dict({})
         assert config.name == "SmartAgent"
-        assert config.model_provider.provider == "openai"
+        assert config.model_provider.provider == "openrouter"
         assert config.io_config.output_format == "text"
         assert config.model_behavior.temperature == 0.7
         assert config.output_style.tone == "neutral"
@@ -178,10 +178,10 @@ class TestSystemPromptManager:
         config = ConfigLoader.from_dict({})
         prompts = SystemPromptManager.build_prompts(config)
         
-        assert "primary intelligent agent" in prompts.main_ai.lower()
-        assert "mentor" in prompts.mentor_ai.lower()
-        assert "deep-thinking" in prompts.deep_thinker_ai.lower()
-        assert "memory matcher" in prompts.fast_memory_ai.lower()
+        assert "nexlab core" in prompts.main_ai.lower()
+        assert "nexlab mentor" in prompts.mentor_ai.lower()
+        assert "nexlab deepthinker" in prompts.deep_thinker_ai.lower()
+        assert "nexlab synapse" in prompts.fast_memory_ai.lower()
 
     def test_prompts_include_behavioral_instructions(self) -> None:
         config = ConfigLoader.from_dict({

@@ -1,24 +1,30 @@
 import os
-import asyncio
+import sys
 from pathlib import Path
-from smart_agent_arch.live_runtime import start_live_chat
-from smart_agent_arch.config_loader import ConfigLoader
+from smart_agent_arch import initialize_ai
 
-async def run_pack():
+def run_pack():
     current_dir = Path(__file__).parent
-    
-    # Load configuration
     config_file = current_dir / "agent_config.yaml"
-    config = ConfigLoader.from_yaml(config_file)
-    
-    # Path to custom tools for this specific pack
-    tools_dir = current_dir / "tools"
     
     print(f"[*] Starting CoderAgent Pack with isolated tools...")
-    await start_live_chat(config, custom_tools_dir=str(tools_dir))
+    ai = initialize_ai(config_file)
+    ai.start()
+    
+    try:
+        while True:
+            sys.stdout.write("\nUser: ")
+            user_input = sys.stdin.readline().strip()
+            if not user_input or user_input.lower() in ['exit', 'quit']:
+                break
+                
+            response = ai.send_text(user_input)
+            print(f"\nCoderAgent:\n{response.content}")
+    finally:
+        ai.stop()
 
 if __name__ == "__main__":
     try:
-        asyncio.run(run_pack())
+        run_pack()
     except KeyboardInterrupt:
         print("\n[!] Pack execution terminated.")
