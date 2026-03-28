@@ -215,22 +215,22 @@ class UserAIFacade:
         )
         
         self._start_worker_if_needed()
-        # Components will be started lazily on first activity or explicit start() call
         self._components_started = False
+        self._start_components()
 
-    def start(self) -> None:
+    def _start_components(self) -> None:
         """Explicitly start all background workers."""
         with self._lock:
             if not self._components_started:
                 self._mentor.start()
                 self._deep_thinker.start()
                 self._components_started = True
-                self._event_cache.add(kind="system", summary="Background components started manually")
+                self._event_cache.add(kind="system", summary="Background components started")
 
     def _ensure_active(self) -> None:
-        """Helper to lazy-start components on first use."""
+        """Helper to lazy-start components on first use without changing logical state."""
         if not self._components_started:
-            self.start()
+            self._start_components()
 
     def diagnostics(self, last_n: int = 20) -> None:
         """Prints a beautiful diagnostic report of recent events and model performance."""
@@ -272,7 +272,6 @@ class UserAIFacade:
         return dict(self._config)
 
     def send_text(self, text: str, metadata: dict[str, Any] | None = None) -> RuntimeResponse:
-        self._ensure_active()
         blocked = self._prepare_input_flow()
         if blocked is not None:
             return blocked

@@ -17,34 +17,76 @@ def update_cmd():
     """Handles the 'update' command."""
     project_root = get_project_root()
     git_dir = project_root / ".git"
+    repo_url = "https://github.com/MikeMartemianov/NexLab"
+    zip_url = f"{repo_url}/archive/refs/heads/main.zip"
     
-    if not git_dir.exists():
-        console.print("[yellow]⚠ Manual installation detected (no .git folder).[/yellow]")
-        console.print("To update, please use pip:")
-        console.print("[bold cyan]pip install --upgrade smart-agent-arch[/bold cyan]")
-        return
-        
+    if git_dir.exists():
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                transient=True,
+            ) as progress:
+                progress.add_task(description="Fetching updates from GitHub...", total=None)
+                subprocess.run(["git", "fetch", "origin"], cwd=str(project_root), check=True, capture_output=True)
+                
+                progress.add_task(description="Merging changes...", total=None)
+                result = subprocess.run(["git", "pull", "origin", "main"], cwd=str(project_root), check=True, capture_output=True, text=True)
+                
+                progress.add_task(description="Updating dependencies...", total=None)
+                subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], cwd=str(project_root), check=True, capture_output=True)
+                
+            console.print("✅ [bold green]Git update successful![/bold green]")
+            return
+        except Exception as e:
+            console.print(f"[yellow]⚠ Git update failed, trying direct download...[/yellow]")
+
+    # Fallback: ZIP download for non-git or failed git
+    import urllib.request
+    import zipfile
+    import shutil
+    import tempfile
+
     try:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
-            progress.add_task(description="Fetching updates from GitHub...", total=None)
-            subprocess.run(["git", "fetch", "origin"], cwd=str(project_root), check=True, capture_output=True)
+            progress.add_task(description=f"Downloading source from {repo_url}...", total=None)
             
-            progress.add_task(description="Merging changes...", total=None)
-            result = subprocess.run(["git", "pull", "origin", "main"], cwd=str(project_root), check=True, capture_output=True, text=True)
-            
-            progress.add_task(description="Updating dependencies...", total=None)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                zip_path = Path(tmpdir) / "main.zip"
+                urllib.request.urlretrieve(zip_url, zip_path)
+                
+                progress.add_task(description="Extracting files...", total=None)
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(tmpdir)
+                
+                # GitHub zips have a root folder like "NexLab-main"
+                extracted_root = next(Path(tmpdir).glob("NexLab-*"))
+                
+                progress.add_task(description="Applying updates...", total=None)
+                # Overwrite core directories
+                for item in ["src", "desktop_app"]:
+                    src_dir = extracted_root / item
+                    dst_dir = project_root / item
+                    if src_dir.exists():
+                        shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
+                
+                # Update top-level files
+                for item in ["pyproject.toml", "README.md"]:
+                    src_file = extracted_root / item
+                    if src_file.exists():
+                        shutil.copy2(src_file, project_root / item)
+
+            progress.add_task(description="Finalizing environment...", total=None)
             subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], cwd=str(project_root), check=True, capture_output=True)
-            
-        console.print("✅ [bold green]Update successful![/bold green]")
-        if result.stdout.strip():
-            console.print(f"[dim]{result.stdout}[/dim]")
-    except subprocess.CalledProcessError as e:
-        console.print(f"[red]❌ Git Update Error:[/red] {e.stderr if e.stderr else str(e)}")
-        console.print("[dim]Try updating manually or check your internet connection.[/dim]")
+
+        console.print(f"✅ [bold green]Universal update successful![/bold green]")
+        console.print(f"[dim]NexLab updated to the latest version from {repo_url}[/dim]")
+    except Exception as e:
+        console.print(f"[red]❌ Update Error:[/red] {str(e)}")
         sys.exit(1)
 
 def doctor_cmd():

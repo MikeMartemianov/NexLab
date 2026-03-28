@@ -264,6 +264,19 @@ class ConfigLoader:
     }
 
     @staticmethod
+    def from_file(file_path: str | Path) -> FullConfig:
+        """Load configuration from file, determining format by extension."""
+        path = Path(file_path)
+        ext = path.suffix.lower()
+        if ext in (".yaml", ".yml"):
+            return ConfigLoader.from_yaml(path)
+        if ext == ".json":
+            return ConfigLoader.from_json(path)
+        if ext == ".py":
+            return ConfigLoader.from_python_module(path)
+        raise ConfigurationError(f"Unsupported configuration format: {ext}")
+
+    @staticmethod
     def from_dict(config_dict: dict[str, Any]) -> FullConfig:
         """Load configuration from dictionary."""
         validated = ConfigLoader._validate_config(config_dict)
