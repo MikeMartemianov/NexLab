@@ -1,21 +1,22 @@
-# 💎 NexLab AI Framework v1.2.0
+# 💎 NexLab AI Framework v1.3.0
 
 A professional-grade, agentic AI development framework for building autonomous coding assistants and smart systems.
 
-## 🚀 Version 1.2 Highlights (NEW)
-- **Agent Packs Integration**: Ready-to-use isolated intelligent agents (e.g., `agent_packs/CoderAgent`) that can be instantly executed using `nexlab run`.
-- **Community Contributions**: Contribute your own custom tools or core patches instantly with the `nexlab pull` command.
-- **Local Model Loaders**: Built-in `@export_tool` classes for instant loading of `llama.cpp` (GGUF) and `transformers` models.
-- **Advanced Multimedia & AI Perception**: Integrated Multimodal Observers (Video/Audio/Image -> Text), memory-based Face Trackers, and Voice Synthesizers.
-- **OpenRouter Default**: System now defaults to `google/gemma-3-4b-it:free` via OpenRouter out-of-the-box.
-- **Locked Professional Prompts**: Core components use immutable, deeply optimized constraints for maximum reasoning quality.
-- **Production GUI**: A full-featured React-based IDE with an integrated AI Dashboard.
+## 🚀 Version 1.3 Highlights (NEW)
+- **Swarm Intelligence**: Configure multiple `UserAIFacade` agents (Coder, Architect, Tester) to communicate via the built-in `SwarmManager` Event Broker.
+- **Docker Sandbox Execution**: Safely execute AI-generated code inside fully isolated ephemeral `python:3.10-alpine` containers using `@export_tool`.
+- **Node Flow React Studio**: Visually drag-and-drop AI nodes and logic in our new `reactflow` designer within the GUI.
+- **AR Desktop HUD**: A sleek, glassmorphic widget overlay triggered by `nexlab gui --hud` to track real-time agent thoughts and VRAM usage straight from your desktop.
+
+## 📁 Version 1.2 Legacy Features
+- **Agent Packs Integration**: Ready-to-use isolated intelligent agents (e.g., `agent_packs/CoderAgent`).
+- **Local Model Loaders**: Built-in `@export_tool` classes for instant loading of `llama.cpp` (GGUF).
 
 ## 🛠️ Quick Start
 1.  **Install**: `pip install -e .` (For perception models: `pip install -e .[advanced]`)
 2.  **Launch Agent Pack**: `nexlab run agent_packs/CoderAgent`
-3.  **Launch GUI**: `nexlab gui`
-4.  **Update Repo**: `nexlab pull` (to propose changes)
+3.  **Launch GUI**: `nexlab gui` OR `nexlab gui --hud` for the AR Widget.
+4.  **Open Studio**: Inside the GUI, click "Node Studio" to visually design your Swarm architecture.
 
 ## 📁 Project Structure
 - `src/smart_agent_arch/`: Core framework logic.

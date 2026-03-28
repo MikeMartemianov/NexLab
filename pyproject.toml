@@ -4,15 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-agent-arch"
-version = "1.2.0"
-description = "NexLab AI Framework 1.2.0 - Agent Packs, Local Model Loaders, CLI Push/Run, Pro Prompts."
+version = "1.3.0"
+description = "NexLab AI Framework 1.3.0 - Swarm Intelligence, Docker Sandbox, Visual Node UI, AR Desktop HUD."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
   { name = "NexLab" }
 ]
 dependencies = [
-  "rich>=13.0"
+  "rich>=13.0",
+  "docker"
 ]
 
 [project.optional-dependencies]

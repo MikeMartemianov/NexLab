@@ -195,7 +195,7 @@ def version_cmd():
     except ImportError:
         console.print("[red]❌ Error: Could not determine version.[/red]")
 
-def gui_cmd():
+def gui_cmd(hud: bool = False):
     """Launches the desktop GUI application."""
     project_root = get_project_root()
     app_path = project_root / "desktop_app" / "app.py"
@@ -209,10 +209,16 @@ def gui_cmd():
         console.print("[yellow]⚠ Warning: GUI Frontend build (dist folder) not found.[/yellow]")
         console.print("[bold cyan]Pro-tip:[/bold cyan] Run [bold white]nexlab build-gui[/bold white] to automatically build the production UI.\n")
 
-    console.print(Panel("🌐 [bold magenta]NexLab GUI:[/bold magenta] Launching Native Desktop App...", expand=False))
+    mode_text = "[bold cyan]HUD Mode[/bold cyan]" if hud else "[bold magenta]Native Desktop App[/bold magenta]"
+    console.print(Panel(f"🌐 [bold magenta]NexLab GUI:[/bold magenta] Launching {mode_text}...", expand=False))
+    
+    cmd_args = [sys.executable, str(app_path)]
+    if hud:
+        cmd_args.append("--hud")
+        
     try:
         # Use Python executable to launch the app script
-        subprocess.Popen([sys.executable, str(app_path)], 
+        subprocess.Popen(cmd_args, 
                          cwd=str(project_root), 
                          shell=(sys.platform == "win32"), 
                          stdout=subprocess.DEVNULL, 
@@ -286,7 +292,9 @@ def main():
     subparsers.add_parser("status", help="Show framework status")
     subparsers.add_parser("logs", help="View the internal log file")
     subparsers.add_parser("version", help="Show current version")
-    subparsers.add_parser("gui", help="Launch the desktop application")
+    gui_parser = subparsers.add_parser("gui", help="Launch the desktop application")
+    gui_parser.add_argument("--hud", action="store_true", help="Launch in AR Desktop HUD mode")
+    
     subparsers.add_parser("build-gui", help="Automatically build the React frontend")
     subparsers.add_parser("pull", help="Package your customized NexLab for contribution")
     
@@ -310,7 +318,7 @@ def main():
     elif args.command == "build-gui":
         build_gui_command()
     elif args.command == "gui":
-        gui_cmd()
+        gui_cmd(hud=args.hud)
     elif args.command == "pull":
         pull_cmd()
     elif args.command == "run":

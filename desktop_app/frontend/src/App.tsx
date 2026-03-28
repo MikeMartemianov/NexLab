@@ -4,8 +4,9 @@ import {
   FileCode, MessageSquare, Activity, Settings, 
   Terminal as TerminalIcon, FolderTree, 
   Cpu, Zap, Shield, ChevronRight, ChevronDown, 
-  X, Save, Play, Boxes, CheckCircle2, Layout, Send, Layers
+  X, Save, Play, Boxes, CheckCircle2, Layout, Send, Layers, Share2
 } from 'lucide-react';
+import NodeEditor from './components/NodeEditor';
 
 const API_BASE = 'http://127.0.0.1:8000';
 
@@ -235,6 +236,7 @@ export default function App() {
 
   const [showConfig, setShowConfig] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [showStudio, setShowStudio] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   
   const [chatMsgs, setChatMsgs] = useState<ChatMessage[]>([]);
@@ -449,9 +451,14 @@ export default function App() {
                     <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>Advanced Agent Blueprint</h2>
                     <p style={{ margin: 0, color: 'var(--text-main)', opacity: 0.8 }}>Design incredibly powerful AI agents via our advanced configuration system, fully abstracted from the code.</p>
                   </div>
-                  <button className="btn btn-primary" onClick={() => setShowWizard(true)} style={{ padding: '12px 24px', fontSize: '15px' }}>
-                    <Layers size={18} style={{ verticalAlign: 'middle', marginRight: '6px' }}/> Open Studio
-                  </button>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button className="btn btn-secondary" onClick={() => setShowWizard(true)} style={{ padding: '12px 24px', fontSize: '15px' }}>
+                      <Layers size={18} style={{ verticalAlign: 'middle', marginRight: '6px' }}/> Agent Wizard
+                    </button>
+                    <button className="btn btn-primary" onClick={() => setShowStudio(true)} style={{ padding: '12px 24px', fontSize: '15px' }}>
+                      <Share2 size={18} style={{ verticalAlign: 'middle', marginRight: '6px' }}/> Node Studio
+                    </button>
+                  </div>
                 </div>
 
                 <div className="glass-card">
@@ -521,6 +528,7 @@ export default function App() {
 
       {showConfig && <SettingsModal defaultConf={internalAgentConfig || {}} onClose={() => setShowConfig(false)} onSave={saveInternalConfig} />}
       {showWizard && <SettingsModal isProjectWizard={true} onClose={() => setShowWizard(false)} onSave={createProject} />}
+      <NodeEditor isVisible={showStudio} onClose={() => setShowStudio(false)} />
     </div>
   );
 }

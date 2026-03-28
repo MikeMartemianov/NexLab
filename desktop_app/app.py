@@ -162,13 +162,27 @@ def main():
                     """)
                 url = "file://" + fallback_path.replace("\\", "/")
 
-        webview.create_window(
-            "NexLab AI Code Editor",
-            url,
-            width=1400,
-            height=900,
-            min_size=(900, 600),
-        )
+        is_hud = "--hud" in sys.argv
+        if is_hud:
+            url += "#/hud"
+            webview.create_window(
+                "NexLab HUD",
+                url,
+                width=350,
+                height=250,
+                frameless=True,
+                transparent=True,
+                easy_drag=True,
+                on_top=True
+            )
+        else:
+            webview.create_window(
+                "NexLab AI Code Editor",
+                url,
+                width=1400,
+                height=900,
+                min_size=(900, 600),
+            )
         webview.start()
     except ImportError:
         # Fallback: just open in browser

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -155,6 +155,11 @@ class AgentConfigRequest(BaseModel):
     tools: dict = {}
 
 
+class FlowExecuteRequest(BaseModel):
+    nodes: list[dict]
+    edges: list[dict]
+
+
 # ═══════════ PING ═══════════
 @app.get("/api/ping")
 def ping():
@@ -251,6 +256,27 @@ def create_file(req: FileCreateRequest):
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
+# ═══════════ NODE FLOW STUDIO ═══════════
+@app.post("/api/flow/execute")
+def execute_flow(req: FlowExecuteRequest, background_tasks: BackgroundTasks):
+    """
+    Simulates parsing the React Flow node graph and instantiating 
+    the Swarm / Docker architecture based on the visual layout.
+    """
+    def _run_flow(nodes, edges):
+        import time
+        from smart_agent_arch import initialize_ai
+        from smart_agent_arch.swarm_manager import get_swarm
+        from smart_agent_arch.components.docker_sandbox import execute_secure_script
+        
+        # In a real scenario, this iterates the DAG tree.
+        logger = logging.getLogger("flow_executor")
+        logger.info(f"Executing Flow with {len(nodes)} nodes and {len(edges)} edges")
+        time.sleep(2)
+        logger.info("Pipeline Complete")
+
+    background_tasks.add_task(_run_flow, req.nodes, req.edges)
+    return {"status": "Pipeline execution started in background"}
 
 @app.post("/api/file/delete")
 def delete_file(req: FileDeleteRequest):

@@ -1,3 +1,0 @@
-Qwen2-VL-2B-Instruct
-Qwen2.5-1.5B-Instruct
-Kokoro-82M
