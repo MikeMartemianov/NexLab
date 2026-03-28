@@ -112,6 +112,9 @@ def update_cmd():
                     if src_file.exists():
                         shutil.copy2(src_file, project_root / item)
 
+            progress.add_task(description="Building Premium GUI...", total=None)
+            build_gui_command()
+
             progress.add_task(description="Finalizing environment...", total=None)
             subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], cwd=str(project_root), check=True, capture_output=True)
 
@@ -247,10 +250,10 @@ def main():
         logs_cmd()
     elif args.command == "version":
         version_cmd()
-    elif args.command == "gui":
-        gui_cmd()
     elif args.command == "build-gui":
         build_gui_command()
+    elif args.command == "gui":
+        gui_cmd()
     else:
         parser.print_help()
 
