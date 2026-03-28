@@ -40,7 +40,7 @@ def update_cmd():
         console.print("✅ [bold green]Update successful![/bold green]")
         console.print(f"[dim]{result.stdout}[/dim]")
     except subprocess.CalledProcessError as e:
-        console.print(f"[red]❌ Error during update:[/red] {e.stderr.decode() if e.stderr else str(e)}")
+        console.print(f"[red]❌ Error during update:[/red] {e.stderr if e.stderr else str(e)}")
         sys.exit(1)
 
 def doctor_cmd():
