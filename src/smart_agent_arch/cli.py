@@ -16,11 +16,13 @@ def get_project_root():
 def update_cmd():
     """Handles the 'update' command."""
     project_root = get_project_root()
-    console.print(Panel("🚀 [bold cyan]NexLab:[/bold cyan] Updating smart-agent-arch from GitHub...", expand=False))
+    git_dir = project_root / ".git"
     
-    if not (project_root / ".git").exists():
-        console.print("[red]❌ Error: Project root not found or not a git repository.[/red]")
-        sys.exit(1)
+    if not git_dir.exists():
+        console.print("[yellow]⚠ Manual installation detected (no .git folder).[/yellow]")
+        console.print("To update, please use pip:")
+        console.print("[bold cyan]pip install --upgrade smart-agent-arch[/bold cyan]")
+        return
         
     try:
         with Progress(
@@ -28,19 +30,21 @@ def update_cmd():
             TextColumn("[progress.description]{task.description}"),
             transient=True,
         ) as progress:
-            progress.add_task(description="Fetching updates...", total=None)
+            progress.add_task(description="Fetching updates from GitHub...", total=None)
             subprocess.run(["git", "fetch", "origin"], cwd=str(project_root), check=True, capture_output=True)
             
-            progress.add_task(description="Pulling changes...", total=None)
+            progress.add_task(description="Merging changes...", total=None)
             result = subprocess.run(["git", "pull", "origin", "main"], cwd=str(project_root), check=True, capture_output=True, text=True)
             
-            progress.add_task(description="Refreshing environment...", total=None)
+            progress.add_task(description="Updating dependencies...", total=None)
             subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], cwd=str(project_root), check=True, capture_output=True)
             
         console.print("✅ [bold green]Update successful![/bold green]")
-        console.print(f"[dim]{result.stdout}[/dim]")
+        if result.stdout.strip():
+            console.print(f"[dim]{result.stdout}[/dim]")
     except subprocess.CalledProcessError as e:
-        console.print(f"[red]❌ Error during update:[/red] {e.stderr if e.stderr else str(e)}")
+        console.print(f"[red]❌ Git Update Error:[/red] {e.stderr if e.stderr else str(e)}")
+        console.print("[dim]Try updating manually or check your internet connection.[/dim]")
         sys.exit(1)
 
 def doctor_cmd():
