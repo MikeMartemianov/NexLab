@@ -96,14 +96,15 @@ const Dashboard = ({ stats }: { stats: any }) => (
       <div className="content-panel project-info">
         <h3><Info size={18} /> Project Information</h3>
         <p><strong>Name:</strong> {stats?.projectName || 'Unnamed Project'}</p>
-        <p><strong>Status:</strong> <span style={{ color: 'var(--status-success)' }}>Active & Connected</span></p>
+        <p><strong>Status:</strong> <span style={{ color: 'var(--status-success)', textShadow: '0 0 10px var(--status-success)' }}>Active & Connected</span></p>
         <div className="progress-bar"><div className="progress-fill" style={{ width: '68%' }}></div></div>
-        <small>Framework Maturity: Release 1.0.0 Stable</small>
+        <small>Framework Maturity: Release 1.5.0 Stable</small>
       </div>
       <div className="content-panel agent-activity">
         <h3><Activity size={18} /> Recent Activity</h3>
         <div className="activity-list" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-          <div style={{ marginBottom: '8px' }}>• AI initialized successfully (v1.0.0)</div>
+          <div style={{ marginBottom: '8px' }}>• Advanced UI Overhaul complete (v1.5.0)</div>
+          <div style={{ marginBottom: '8px' }}>• AI initialized successfully (v1.5.0)</div>
           <div style={{ marginBottom: '8px' }}>• Configuration sync: System Optimal</div>
           <div style={{ marginBottom: '8px' }}>• Memory pool optimized for long-context</div>
         </div>
@@ -248,7 +249,7 @@ const Explorer = ({ files, onSelect, onCreateFile, onCreateDir }: any) => (
 
 const TerminalComponent = ({ onCommand }: { onCommand: (cmd: string) => void }) => {
   const [input, setInput] = useState('');
-  const [history, setHistory] = useState<string[]>(['Welcome to NexLab 1.0 Professional Terminal.', 'Type "help" to see capabilities.']);
+  const [history, setHistory] = useState<string[]>(['Welcome to NexLab 1.5.0 Professional Terminal.', 'Type "help" to see capabilities.']);
   
   const handleSubmit = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && input.trim()) {
@@ -275,9 +276,10 @@ const WelcomeView = ({ onNewProject }: { onNewProject: () => void }) => (
   <div className="welcome-screen">
     <div className="premium-glow"></div>
     <div className="welcome-logo">💎</div>
-    <div className="welcome-title">NexLab AI Framework 1.0</div>
+    <div className="welcome-title">NexLab AI Framework 1.5.0</div>
     <div className="welcome-subtitle">
       The state-of-the-art environment for building next-generation agentic workflows.
+      <br/>Now with enhanced Glassmorphic UI and optimized web deployment.
     </div>
     <div className="welcome-actions">
       <button className="primary-btn" onClick={onNewProject}>
@@ -332,7 +334,7 @@ export default function App() {
   // Data
   const [files, setFiles] = useState<FileNode[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'NexLab 1.0 initialized. Systems verified. How shall we build today?' }
+    { role: 'assistant', content: 'NexLab 1.5.0 initialized. UI Overhauled. Systems verified. How shall we build today?' }
   ]);
   const [isThinking, setIsThinking] = useState(false);
   const [diagnostics, setDiagnostics] = useState<any[]>([]);
@@ -498,7 +500,7 @@ export default function App() {
         {terminalOpen && (
           <div className="bottom-panel" style={{ height: panelHeight }}>
             <div className="panel-header">
-              <span><TerminalIcon size={14} style={{ marginRight: 6 }} /> NEXLAB TERMINAL v1.0</span>
+              <span><TerminalIcon size={14} style={{ marginRight: 6 }} /> NEXLAB TERMINAL v1.5.0</span>
               <X size={14} style={{ cursor: 'pointer' }} onClick={() => setTerminalOpen(false)} />
             </div>
             <div className="panel-content"><TerminalComponent onCommand={(cmd) => apiPost('/api/terminal/exec', { command: cmd })} /></div>
@@ -512,7 +514,7 @@ export default function App() {
             <div className="statusbar-item"><CheckCircle2 size={14} color="#5bffc2" /> <span>Unified Kernel Active</span></div>
           </div>
           <div className="statusbar-right">
-            <div className="statusbar-item">{activeFile ? getLang(activeFile) : 'Framework 1.0.0'}</div>
+            <div className="statusbar-item">{activeFile ? getLang(activeFile) : 'Framework 1.5.0'}</div>
             <div className="statusbar-item">
               <Cpu size={14} /> {agentConfig.provider}:{agentConfig.model}
             </div>
