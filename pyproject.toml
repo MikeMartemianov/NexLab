@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-agent-arch"
-version = "1.1"
-description = "NexLab AI Framework 1.1 - Multimodal Observer, Face Tracking, Voice Synthesizer, and OpenRouter integration."
+version = "1.2.0"
+description = "NexLab AI Framework 1.2.0 - Agent Packs, Local Model Loaders, CLI Push/Run, Pro Prompts."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [

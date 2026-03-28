@@ -222,6 +222,59 @@ def gui_cmd():
     except Exception as e:
         console.print(f"[red]❌ Error launching GUI:[/red] {e}")
 
+def pull_cmd():
+    """Package local improvements to propose them."""
+    project_root = get_project_root()
+    console.print(Panel("[bold cyan]🔄 NexLab Pull (Contribute):[/bold cyan] Packaging your improvements...", expand=False))
+    
+    import zipfile
+    from datetime import datetime
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    zip_name = f"nexlab_improvement_{timestamp}.zip"
+    zip_path = project_root / zip_name
+    
+    try:
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
+            progress.add_task(description=f"Creating {zip_name}...", total=None)
+            
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, _, files in os.walk(project_root):
+                    root_path = Path(root)
+                    if any(part in [".git", "__pycache__", "node_modules", "dist", "venv", ".venv"] for part in root_path.parts):
+                        continue
+                    for file in files:
+                        if file.endswith(".zip"):
+                            continue
+                        file_path = root_path / file
+                        arcname = file_path.relative_to(project_root)
+                        zipf.write(file_path, arcname)
+                        
+        console.print(f"✅ [bold green]Successfully packed improvements into {zip_name}[/bold green]")
+        console.print("[dim]You can now upload this file to the NexLab community to propose your update![/dim]")
+    except Exception as e:
+        console.print(f"[red]❌ Error generating pull package: {e}[/red]")
+
+def run_cmd(pack_path: str):
+    """Run a pre-configured Agent Pack."""
+    project_root = get_project_root()
+    pack_dir = Path(pack_path)
+    if not pack_dir.is_absolute():
+        pack_dir = project_root / pack_dir
+        
+    if not pack_dir.exists() or not pack_dir.is_dir():
+        console.print(f"[red]❌ Error: Agent pack not found at {pack_dir}[/red]")
+        sys.exit(1)
+        
+    console.print(Panel(f"[bold magenta]🚀 Launching Agent Pack:[/bold magenta] {pack_dir.name}", expand=False))
+    
+    main_py = pack_dir / "main.py"
+    if main_py.exists():
+        console.print("Executing pack via internal main.py script...")
+        subprocess.run([sys.executable, str(main_py)], cwd=str(pack_dir))
+    else:
+        console.print("[yellow]⚠ Pack missing main.py entrypoint.[/yellow]")
+
 def main():
     parser = argparse.ArgumentParser(description="NexLab AI CLI Tool")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -235,6 +288,10 @@ def main():
     subparsers.add_parser("version", help="Show current version")
     subparsers.add_parser("gui", help="Launch the desktop application")
     subparsers.add_parser("build-gui", help="Automatically build the React frontend")
+    subparsers.add_parser("pull", help="Package your customized NexLab for contribution")
+    
+    run_parser = subparsers.add_parser("run", help="Run a custom Agent Pack")
+    run_parser.add_argument("pack_path", nargs="?", default="agent_packs/CoderAgent", help="Path to the agent pack directory")
     
     args = parser.parse_args()
     
@@ -254,6 +311,10 @@ def main():
         build_gui_command()
     elif args.command == "gui":
         gui_cmd()
+    elif args.command == "pull":
+        pull_cmd()
+    elif args.command == "run":
+        run_cmd(args.pack_path)
     else:
         parser.print_help()
 

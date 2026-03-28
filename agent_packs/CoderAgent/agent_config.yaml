@@ -1,0 +1,13 @@
+provider: openrouter
+model: google/gemma-3-4b-it:free
+temperature: 0.2
+top_p: 0.95
+output_format: markdown
+language: en
+tone: technical
+verbose_level: 2
+include_reasoning: true
+memory_retention_days: 14
+storage_backend: memory
+mentor_enabled: true
+deep_thinker_enabled: true

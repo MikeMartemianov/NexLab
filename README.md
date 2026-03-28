@@ -1,18 +1,21 @@
-# 💎 NexLab AI Framework v1.0.0
+# 💎 NexLab AI Framework v1.2.0
 
 A professional-grade, agentic AI development framework for building autonomous coding assistants and smart systems.
 
-## 🚀 Version 1.0 Highlights
-- **Production GUI**: A full-featured React-based IDE with deep agent integration.
-- **Real-time Diagnostics**: Monitor agent health, events, and performance via the integrated dashboard.
-- **Tool Management**: Dynamic registration and inspection of custom AI capabilities.
-- **Universal Updates**: Git-less framework updates directly from the cloud.
-- **Self-Healing Core**: Resilient background workers with automatic recovery.
+## 🚀 Version 1.2 Highlights (NEW)
+- **Agent Packs Integration**: Ready-to-use isolated intelligent agents (e.g., `agent_packs/CoderAgent`) that can be instantly executed using `nexlab run`.
+- **Community Contributions**: Contribute your own custom tools or core patches instantly with the `nexlab pull` command.
+- **Local Model Loaders**: Built-in `@export_tool` classes for instant loading of `llama.cpp` (GGUF) and `transformers` models.
+- **Advanced Multimedia & AI Perception**: Integrated Multimodal Observers (Video/Audio/Image -> Text), memory-based Face Trackers, and Voice Synthesizers.
+- **OpenRouter Default**: System now defaults to `google/gemma-3-4b-it:free` via OpenRouter out-of-the-box.
+- **Locked Professional Prompts**: Core components use immutable, deeply optimized constraints for maximum reasoning quality.
+- **Production GUI**: A full-featured React-based IDE with an integrated AI Dashboard.
 
 ## 🛠️ Quick Start
-1.  **Install**: `pip install .`
-2.  **Launch GUI**: `nexlab-gui`
-3.  **Chat**: Talk to your agent in the sidebar to start building.
+1.  **Install**: `pip install -e .` (For perception models: `pip install -e .[advanced]`)
+2.  **Launch Agent Pack**: `nexlab run agent_packs/CoderAgent`
+3.  **Launch GUI**: `nexlab gui`
+4.  **Update Repo**: `nexlab pull` (to propose changes)
 
 ## 📁 Project Structure
 - `src/smart_agent_arch/`: Core framework logic.
@@ -158,10 +161,16 @@ command_parser:
 update_from_github()
 ```
 
-**18. NexLab CLI** - Command-line interface for maintenance
+**18. NexLab CLI** - Command-line interface for maintenance and execution
 ```bash
-# Update everything from terminal:
+# Update from terminal:
 nexlab update
+
+# Launch an Agent Pack:
+nexlab run agent_packs/CoderAgent
+
+# Zip and propose local changes:
+nexlab pull
 ```
 
 **19. Event Hook System** - Subscribe to agent lifecycle events
