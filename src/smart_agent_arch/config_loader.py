@@ -220,8 +220,8 @@ class ConfigLoader:
     # Default values for all 12+ customizations
     DEFAULTS = {
         # Model and provider
-        "provider": "openai",
-        "model": "gpt-3.5-turbo",
+        "provider": "openrouter",
+        "model": "google/gemma-3-4b-it:free",
         "temperature": 0.7,
         "top_p": 0.9,
 
@@ -379,8 +379,8 @@ class ConfigLoader:
         """Build FullConfig object from validated dictionary."""
         # Model provider
         provider_config = ModelProviderConfig(
-            provider=validated.get("provider", "openai"),
-            model=validated.get("model", "gpt-3.5-turbo"),
+            provider=validated.get("provider", "openrouter"),
+            model=validated.get("model", "google/gemma-3-4b-it:free"),
             api_key=validated.get("api_key"),
             base_url=validated.get("base_url"),
             timeout_sec=int(validated.get("model_timeout_sec", 60)),

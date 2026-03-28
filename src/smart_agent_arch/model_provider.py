@@ -164,6 +164,14 @@ class OpenAIProvider(ModelProvider):
         return response.choices[0].message.content or ""
 
 
+class OpenRouterProvider(OpenAIProvider):
+    """OpenRouter API provider (uses OpenAI compatible endpoints)."""
+    def __init__(self, config: ModelProviderConfig) -> None:
+        super().__init__(config)
+        self.base_url = _sanitize_base_url(config.base_url) or "https://openrouter.ai/api/v1"
+        if not self.model:
+            self.model = "google/gemma-3-4b-it:free"
+
 class OllamaProvider(ModelProvider):
     """Ollama local model provider."""
 
@@ -347,6 +355,7 @@ class ModelResolver:
         "openai": OpenAIProvider,
         "ollama": OllamaProvider,
         "anthropic": AnthropicProvider,
+        "openrouter": OpenRouterProvider,
     }
 
     @staticmethod
