@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Activity, Brain, Cpu, MemoryStick } from 'lucide-react';
 
 const HUDWidget = () => {

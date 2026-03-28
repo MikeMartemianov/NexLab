@@ -65,6 +65,8 @@ class ScriptThinkerRuntime:
         self.calls = 0
 
     def think(self, task_text: str, runtime_context: dict[str, object]) -> ThinkerOutcome | None:
+        import time
+        time.sleep(0.15)
         del task_text, runtime_context
         self.calls += 1
         if self.outcomes:

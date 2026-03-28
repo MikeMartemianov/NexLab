@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -7,7 +7,7 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
-  Panel,
+  BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -25,7 +25,7 @@ const initialEdges = [
 ];
 
 const NodeEditor = ({ isVisible, onClose }: { isVisible: boolean, onClose: () => void }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [nodes, , onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [running, setRunning] = useState(false);
 
@@ -76,7 +76,7 @@ const NodeEditor = ({ isVisible, onClose }: { isVisible: boolean, onClose: () =>
         >
           <Controls />
           <MiniMap nodeStrokeWidth={3} />
-          <Background variant="dots" gap={12} size={1} />
+          <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
         </ReactFlow>
       </div>
     </div>
