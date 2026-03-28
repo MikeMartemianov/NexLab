@@ -95,7 +95,7 @@ venv.bak/
 # Frontend (Node.js)
 node_modules/
 desktop_app/frontend/node_modules/
-desktop_app/frontend/dist/
+
 desktop_app/frontend/dist-ssr/
 *.log
 npm-debug.log*
