@@ -98,6 +98,9 @@ def main():
     subparsers.add_parser("update", help="Update the package from GitHub")
     subparsers.add_parser("doctor", help="Check system health")
     subparsers.add_parser("status", help="Show framework status")
+    subparsers.add_parser("logs", help="View the internal log file")
+    subparsers.add_parser("version", help="Show current version")
+    subparsers.add_parser("gui", help="Launch the desktop application")
     
     args = parser.parse_args()
     
@@ -107,6 +110,12 @@ def main():
         doctor_cmd()
     elif args.command == "status":
         status_cmd()
+    elif args.command == "logs":
+        logs_cmd()
+    elif args.command == "version":
+        version_cmd()
+    elif args.command == "gui":
+        gui_cmd()
     else:
         parser.print_help()
 

@@ -17,7 +17,7 @@ from smart_agent_arch.long_memory import LongMemory
 from smart_agent_arch.mentor_ai import MentorAIComponent, MentorGateway, StubMentorGateway
 from smart_agent_arch.system_prompt_manager import SystemPromptManager
 from smart_agent_arch.tools_loader import ToolsLoader
-from smart_agent_arch.hooks import HookManager, EventKind
+from smart_agent_arch.hooks import HookManager, EventKind, FileLogger
 
 MediaType = Literal["text", "image", "video", "audio"]
 
@@ -150,6 +150,12 @@ class UserAIFacade:
         
         # Initialize Hooks
         self._hooks = HookManager()
+
+        # Attach file logger if configured
+        if self._full_config.logging.log_file:
+            logger = FileLogger(self._full_config.logging.log_file)
+            for kind in EventKind:
+                self._hooks.subscribe(kind, logger)
         self._detailed_diagnostics = bool(config_dict.get("detailed_diagnostics", False))
         
         # Initialize custom tools loader

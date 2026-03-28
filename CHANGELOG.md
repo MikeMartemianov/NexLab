@@ -2,19 +2,20 @@
 
 All notable changes to the `smart-agent-arch` project will be documented in this file.
 
+## [0.9.0] - 2026-03-28
+### Added
+- **NexLab Logs**: New `nexlab logs` command to view persistent agent events.
+- **NexLab GUI**: New `nexlab gui` command to launch the native desktop application.
+- **NexLab Version**: New `nexlab version` command for quick version checks.
+- **Persistence Hooks**: Added `FileLogger` to save agent lifecycle events to a JSON-line log file.
+
 ## [0.8.5] - 2026-03-28
 ### Fixed
-- **Sanitization Refinement**: Fixed `_sanitize_base_url` to preserve `/v1` in base URLs. This is essential for OpenAI-compatible providers like Cerebras and Groq that require the version prefix.
+- **Sanitization Refinement**: Preserving `/v1` in base URLs to maintain compatibility with Cerebras/Groq.
 
 ## [0.8.4] - 2026-03-27
 ### Fixed
-- **URL Auto-Sanitization**: Added automatic stripping of redundant suffixes.
-- **Improved Error Guidance**: Added hints for 404 errors.
-
-## [0.8.3] - 2026-03-27
-### Fixed
-- **Custom Provider Persistence**: Refactored the runtime pipeline to preserve `FullConfig` objects.
-- **Base URL Flexibility**: Made `OpenAIProvider`'s API key check optional when using a custom `base_url`.
+- **URL Auto-Sanitization**: Automatic stripping of redundant endpoints.
 
 ## [0.1.0] - 2026-03-18
 ### Added

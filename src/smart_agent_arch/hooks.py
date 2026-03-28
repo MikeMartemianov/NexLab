@@ -32,4 +32,26 @@ class HookManager:
                 callback(kind, payload)
             except Exception as e:
                 # We don't want hooks to break the main execution flow
-                print(f"[Hook Error] Failed to execute {callback}: {e}")
+                pass
+
+class FileLogger:
+    """Writes agent events to a log file."""
+
+    def __init__(self, log_path: str) -> None:
+        self.log_path = log_path
+
+    def __call__(self, kind: Any, payload: Dict[str, Any]) -> None:
+        """Generic listener that logs everything as JSON lines."""
+        import json
+        import time
+        entry = {
+            "timestamp": time.time(),
+            "time_human": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "event": kind.name if hasattr(kind, "name") else str(kind),
+            **payload
+        }
+        try:
+            with open(self.log_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
