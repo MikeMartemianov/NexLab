@@ -74,6 +74,13 @@ class TerminalExecRequest(BaseModel):
 class ProjectCreateRequest(BaseModel):
     path: str
     name: str
+    provider: str = "openai"
+    model: str = "gpt-4o"
+    api_key: str = ""
+    base_url: str = ""
+
+class ProjectRunRequest(BaseModel):
+    script_path: str = "main.py"
 
 
 class ProjectStatsResponse(BaseModel):
@@ -90,6 +97,8 @@ class ChatRequest(BaseModel):
 class AgentConfigRequest(BaseModel):
     provider: str = "ollama"
     model: str = "llama3"
+    api_key: str = ""
+    base_url: str = ""
     temperature: float = 0.7
     mentorEnabled: bool = True
     deepThinkerEnabled: bool = True
@@ -233,12 +242,19 @@ def create_new_project(req: ProjectCreateRequest):
         if not config_path.exists():
             with open(config_path, "w", encoding="utf-8") as f:
                 f.write(f"""# NexLab Agent Configuration: {req.name}
-provider: openai
-model: gpt-4o
+provider: {req.provider}
+model: {req.model}
+api_key: "{req.api_key}"
+base_url: "{req.base_url}"
 temperature: 0.7
 mentor_enabled: true
 deep_thinker_enabled: true
 """)
+
+        req_path = target_path / "requirements.txt"
+        if not req_path.exists():
+            with open(req_path, "w", encoding="utf-8") as f:
+                f.write("git+https://github.com/MikeMartemianov/NexLab.git\n")
 
         main_path = target_path / "main.py"
         if not main_path.exists():
@@ -280,6 +296,27 @@ def get_project_stats():
         }
     except Exception as e:
         return {"error": str(e)}
+
+@app.post("/api/project/run")
+def run_project(req: ProjectRunRequest):
+    """Run the agent's main script in a background process."""
+    try:
+        script = os.path.join(WORKSPACE_ROOT, req.script_path.lstrip("/"))
+        if not os.path.isfile(script):
+            return {"status": "error", "error": f"Script not found: {script}"}
+            
+        # Optional: install requirements if present and user wants it, 
+        # but for safety let's just run the script.
+        proc = subprocess.Popen(
+            [sys.executable, script],
+            cwd=WORKSPACE_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+        return {"status": "ok", "message": f"Started {req.script_path} (PID: {proc.pid})"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 
 # ═══════════ TERMINAL ═══════════
@@ -353,6 +390,8 @@ def configure_agent(req: AgentConfigRequest):
         config_dict: dict[str, Any] = {
             "provider": req.provider,
             "model": req.model,
+            "api_key": req.api_key,
+            "base_url": req.base_url,
             "temperature": req.temperature,
             "mentor_enabled": req.mentorEnabled,
             "deep_thinker_enabled": req.deepThinkerEnabled,
