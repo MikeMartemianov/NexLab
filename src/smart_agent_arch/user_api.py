@@ -215,8 +215,53 @@ class UserAIFacade:
         )
         
         self._start_worker_if_needed()
-        self._mentor.start()
-        self._deep_thinker.start()
+        # Components will be started lazily on first activity or explicit start() call
+        self._components_started = False
+
+    def start(self) -> None:
+        """Explicitly start all background workers."""
+        with self._lock:
+            if not self._components_started:
+                self._mentor.start()
+                self._deep_thinker.start()
+                self._components_started = True
+                self._event_cache.add(kind="system", summary="Background components started manually")
+
+    def _ensure_active(self) -> None:
+        """Helper to lazy-start components on first use."""
+        if not self._components_started:
+            self.start()
+
+    def diagnostics(self, last_n: int = 20) -> None:
+        """Prints a beautiful diagnostic report of recent events and model performance."""
+        try:
+            from rich.console import Console
+            from rich.table import Table
+            from rich.panel import Panel
+            import time
+        except ImportError:
+            print("Rich library not installed. Cannot show beautiful diagnostics.")
+            return
+
+        console = Console()
+        table = Table(title="💎 NexLab Agent Diagnostics", show_lines=True)
+        table.add_column("Time", style="dim")
+        table.add_column("Component", style="cyan")
+        table.add_column("Event", style="magenta")
+        table.add_column("Details", style="white")
+
+        events = self._event_cache.events()[-last_n:]
+        for e in events:
+            # EventRecord uses ISO string timestamp
+            ts_str = getattr(e, "timestamp", str(time.time()))
+            table.add_row(
+                ts_str.split("T")[-1][:8], # HH:MM:SS
+                getattr(e, "kind", "system"),
+                getattr(e, "summary", "No details"),
+                "" # Metadata is not in EventRecord but we can add it later if needed
+            )
+
+        console.print(Panel(table, title="[bold green]System Health Status[/bold green]", expand=False))
 
     def register_hook(self, kind: EventKind, callback: Callable) -> None:
         """Register a custom hook for agent lifecycle events."""
@@ -227,6 +272,7 @@ class UserAIFacade:
         return dict(self._config)
 
     def send_text(self, text: str, metadata: dict[str, Any] | None = None) -> RuntimeResponse:
+        self._ensure_active()
         blocked = self._prepare_input_flow()
         if blocked is not None:
             return blocked

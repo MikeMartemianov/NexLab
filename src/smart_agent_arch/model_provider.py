@@ -30,6 +30,41 @@ def _sanitize_base_url(url: str | None) -> str | None:
 
 class ModelProvider(ABC):
     """Abstract base for model provider implementations."""
+    pass
+
+class GlobalProviderCache:
+    """Cache for ModelProvider instances to avoid redundant SDK client overhead."""
+    _instances: dict[int, ModelProvider] = {}
+
+    @classmethod
+    def get(cls, config: ModelProviderConfig) -> ModelProvider | None:
+        # Create a stable hash based on core config fields
+        config_key = hash((
+            config.provider, 
+            config.model, 
+            config.api_key, 
+            config.base_url,
+            config.timeout_sec,
+            config.custom_module_path,
+            config.custom_function_name
+        ))
+        return cls._instances.get(config_key)
+
+    @classmethod
+    def set(cls, config: ModelProviderConfig, provider: ModelProvider) -> None:
+        config_key = hash((
+            config.provider, 
+            config.model, 
+            config.api_key, 
+            config.base_url,
+            config.timeout_sec,
+            config.custom_module_path,
+            config.custom_function_name
+        ))
+        cls._instances[config_key] = provider
+
+class ModelProvider(ABC):
+    """Abstract base for model provider implementations."""
 
     @abstractmethod
     async def complete(
@@ -315,42 +350,57 @@ class ModelResolver:
     }
 
     @staticmethod
-    def resolve(config: FullConfig, override: ModelProviderConfig | None = None) -> ModelProvider:
+    def resolve(config: FullConfig | dict[str, Any], override: ModelProviderConfig | None = None) -> ModelProvider:
         """Resolve model provider from configuration."""
-        # Check for custom provider function first (if initialized directly from Python)
-        if config.model_provider_function:
-            return CustomProvider(config.model_provider_function, config)
+        if isinstance(config, dict):
+            from smart_agent_arch.config_loader import ConfigLoader
+            config = ConfigLoader.from_dict(config)
 
-        # Resolve built-in or dynamically loaded provider
-        provider_config = override if override else config.model_provider
+        provider_config = override or config.model_provider
+        
+        # Check cache first to avoid redundant SDK client overhead
+        cached = GlobalProviderCache.get(provider_config)
+        if cached:
+            return cached
+
         provider_name = provider_config.provider.lower()
-        
-        if provider_name == "custom" and provider_config.custom_module_path:
-            import importlib.util
-            from pathlib import Path
-            path = Path(provider_config.custom_module_path).resolve()
-            spec = importlib.util.spec_from_file_location("custom_provider_mod", str(path))
-            if spec and spec.loader:
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-                func_name = provider_config.custom_function_name or "complete_fn"
-                if hasattr(module, func_name):
-                    return CustomProvider(getattr(module, func_name), config)
-            raise ConfigurationError(f"Failed to load custom provider '{func_name}' from {path}")
-        
-        if provider_name == "custom_function":
-            if config.model_provider_function:
-                return CustomProvider(config.model_provider_function, config)
-            raise ConfigurationError("provider='custom_function' specified but no function pointer provided in config")
+        provider = None
 
-        if provider_name not in ModelResolver.PROVIDERS:
+        if provider_name == "custom" and provider_config.custom_module_path:
+            provider = ModelResolver._resolve_custom_file(provider_config, config)
+        elif provider_name == "custom_function":
+            if config.model_provider_function:
+                provider = CustomProvider(config.model_provider_function, config)
+            else:
+                raise ConfigurationError("provider='custom_function' specified but no function pointer provided in config")
+        elif provider_name in ModelResolver.PROVIDERS:
+            provider_class = ModelResolver.PROVIDERS[provider_name]
+            provider = provider_class(provider_config)
+        else:
             raise ConfigurationError(
                 f"Unknown provider: {provider_name}. "
                 f"Available: {list(ModelResolver.PROVIDERS.keys()) + ['custom', 'custom_function']}"
             )
+        
+        if provider:
+            GlobalProviderCache.set(provider_config, provider)
+            return provider
+            
+        raise ConfigurationError(f"Could not resolve provider: {provider_name}")
 
-        provider_class = ModelResolver.PROVIDERS[provider_name]
-        return provider_class(provider_config)
+    @staticmethod
+    def _resolve_custom_file(provider_config: ModelProviderConfig, config: FullConfig) -> ModelProvider:
+        import importlib.util
+        from pathlib import Path
+        path = Path(provider_config.custom_module_path).resolve()
+        spec = importlib.util.spec_from_file_location("custom_provider_mod", str(path))
+        if spec and spec.loader:
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            func_name = provider_config.custom_function_name or "complete_fn"
+            if hasattr(module, func_name):
+                return CustomProvider(getattr(module, func_name), config)
+        raise ConfigurationError(f"Failed to load custom provider from {path}")
 
     @staticmethod
     def register_provider(name: str, provider_class: type[ModelProvider]) -> None:
