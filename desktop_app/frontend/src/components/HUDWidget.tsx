@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, Brain, Cpu, MemoryStick } from 'lucide-react';
 
+
 const HUDWidget = () => {
   const [metrics, setMetrics] = useState({
     cpu: 0,
@@ -39,7 +40,7 @@ const HUDWidget = () => {
       userSelect: 'none'
     }}>
       {/* Drag handle */}
-      <div 
+      <div
         className="pywebview-drag-region"
         style={{
           height: '24px',
