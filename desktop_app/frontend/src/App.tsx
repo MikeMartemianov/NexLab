@@ -519,7 +519,7 @@ export default function App() {
         </div>
       </div>
 
-      {showConfig && internalAgentConfig && <SettingsModal defaultConf={internalAgentConfig} onClose={() => setShowConfig(false)} onSave={saveInternalConfig} />}
+      {showConfig && <SettingsModal defaultConf={internalAgentConfig || {}} onClose={() => setShowConfig(false)} onSave={saveInternalConfig} />}
       {showWizard && <SettingsModal isProjectWizard={true} onClose={() => setShowWizard(false)} onSave={createProject} />}
     </div>
   );
