@@ -78,7 +78,6 @@ def status_cmd():
     project_root = get_project_root()
     console.print(Panel("[bold green]📊 NexLab Status:[/bold green] Framework Overview", expand=False))
     
-    # In a real scenario, we might want to load the config here, but for now we show static structure
     table = Table(title="Framework Components", box=None)
     table.add_column("Component", style="cyan")
     table.add_column("Status", style="green")
@@ -90,6 +89,46 @@ def status_cmd():
     table.add_row("Command Parser", "✅ Enabled")
     
     console.print(table)
+
+def logs_cmd():
+    """Displays the last N lines of the agent log."""
+    log_path = Path("nexlab.log")
+    if not log_path.exists():
+        console.print("[yellow]⚠ No log file found (nexlab.log). Ensure 'log_file' is set in config.[/yellow]")
+        return
+        
+    console.print(Panel(f"[bold cyan]📋 NexLab Logs:[/bold cyan] {log_path.absolute()}", expand=False))
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()[-50:]
+            for line in lines:
+                console.print(line.strip(), style="dim", highlight=True)
+    except Exception as e:
+        console.print(f"[red]❌ Error reading logs:[/red] {e}")
+
+def version_cmd():
+    """Displays the version info."""
+    try:
+        from smart_agent_arch.version import __version__
+        console.print(Panel(f"🚀 [bold cyan]NexLab AI Framework[/bold cyan]\nVersion: [bold green]{__version__}[/bold green]", expand=False))
+    except ImportError:
+        console.print("[red]❌ Error: Could not determine version.[/red]")
+
+def gui_cmd():
+    """Launches the desktop GUI application."""
+    project_root = get_project_root()
+    app_path = project_root / "desktop_app" / "app.py"
+    
+    if not app_path.exists():
+        console.print(f"[red]❌ Error: Desktop app not found at {app_path}[/red]")
+        return
+        
+    console.print(Panel("🌐 [bold magenta]NexLab GUI:[/bold magenta] Launching Native Desktop App...", expand=False))
+    try:
+        subprocess.Popen([sys.executable, str(app_path)], cwd=str(project_root), shell=(sys.platform == "win32"))
+        console.print("🚀 [green]GUI command sent. The application window should appear shortly.[/green]")
+    except Exception as e:
+        console.print(f"[red]❌ Error launching GUI:[/red] {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="NexLab AI CLI Tool")
