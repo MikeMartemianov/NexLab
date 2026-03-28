@@ -71,6 +71,22 @@ def _get_ai():
                 "api_key": _current_agent_config.get("api_key", ""),
                 "base_url": _current_agent_config.get("base_url", ""),
                 "temperature": _current_agent_config.get("temperature", 0.7),
+                "system_prompts": {
+                    "first_ai": (
+                        "You are the internal NexLab Code Editor AI Assistant.\n"
+                        "You have full access to the file system and project structure via your injected tools.\n"
+                        "You can create new files (create_file), read files (read_project_file), and execute terminal commands (execute_terminal).\n"
+                        "Your primary expertise is the `smart_agent_arch` framework.\n"
+                        "To build an agent project, the simplest script is:\n"
+                        "```python\n"
+                        "from smart_agent_arch import initialize_ai\n"
+                        "ai = initialize_ai()\n"
+                        "print(ai.send_text('Hello').content)\n"
+                        "```\n"
+                        "The library is downloaded automatically via `requirements.txt` containing `git+https://github.com/MikeMartemianov/NexLab.git` whenever the user clicks Run.\n"
+                        "Be extremely proactive: if the user asks you to create a project, do not tell them how to do it - USE YOUR TOOLS to create the folders, the `main.py`, and the `requirements.txt` directly, and then tell them to press Run!"
+                    )
+                }
             }
             # Remove empty strings to not break validators
             if not config_dict["api_key"]: config_dict.pop("api_key", None)
@@ -339,16 +355,36 @@ def run_project(req: ProjectRunRequest):
         if not os.path.isfile(script):
             return {"status": "error", "error": f"Script not found: {script}"}
             
-        # Optional: install requirements if present and user wants it, 
-        # but for safety let's just run the script.
+        script_dir = os.path.dirname(script)
+        
+        # 1. Auto-install dependencies if requirements.txt exists
+        req_path = os.path.join(script_dir, "requirements.txt")
+        install_log = ""
+        if os.path.isfile(req_path):
+            install_log = "Installing dependencies (NexLab GitHub Library)...\n"
+            try:
+                install_proc = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+                    cwd=script_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=90
+                )
+                install_log += install_proc.stdout + "\n"
+                if install_proc.stderr:
+                    install_log += f"Errors:\n{install_proc.stderr}\n"
+            except Exception as e:
+                install_log += f"PIP Failed: {e}\n"
+
+        # 2. Run the actual agent script
         proc = subprocess.Popen(
             [sys.executable, script],
-            cwd=WORKSPACE_ROOT,
+            cwd=script_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True
         )
-        return {"status": "ok", "message": f"Started {req.script_path} (PID: {proc.pid})"}
+        return {"status": "ok", "message": f"{install_log}\nSuccessfully started {req.script_path} (PID: {proc.pid})"}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
