@@ -38,13 +38,23 @@ def _get_ai():
         try:
             from smart_agent_arch.user_api import UserAIFacade
             _ai_facade = UserAIFacade(config={
-                "provider": "ollama",
-                "model": "llama3",
-                "temperature": 0.7,
+                "provider": _current_agent_config.get("provider", "ollama"),
+                "model": _current_agent_config.get("model", "llama3"),
+                "temperature": _current_agent_config.get("temperature", 0.7),
             })
         except Exception:
             _ai_facade = None
     return _ai_facade
+
+_current_agent_config = {
+    "provider": "openai",
+    "model": "gpt-4o",
+    "api_key": "",
+    "base_url": "",
+    "temperature": 0.7,
+    "mentorEnabled": True,
+    "deepThinkerEnabled": True,
+}
 
 
 # ═══════════ MODELS ═══════════
@@ -74,10 +84,7 @@ class TerminalExecRequest(BaseModel):
 class ProjectCreateRequest(BaseModel):
     path: str
     name: str
-    provider: str = "openai"
-    model: str = "gpt-4o"
-    api_key: str = ""
-    base_url: str = ""
+    config: dict = {}
 
 class ProjectRunRequest(BaseModel):
     script_path: str = "main.py"
@@ -240,16 +247,18 @@ def create_new_project(req: ProjectCreateRequest):
 
         config_path = target_path / "config.yaml"
         if not config_path.exists():
+            import yaml
+            # Default fallback if empty
+            cfg_data = req.config if req.config else {
+                "name": req.name,
+                "provider": "openai",
+                "model": "gpt-4o",
+                "temperature": 0.7,
+                "mentor_enabled": True,
+                "deep_thinker_enabled": True
+            }
             with open(config_path, "w", encoding="utf-8") as f:
-                f.write(f"""# NexLab Agent Configuration: {req.name}
-provider: {req.provider}
-model: {req.model}
-api_key: "{req.api_key}"
-base_url: "{req.base_url}"
-temperature: 0.7
-mentor_enabled: true
-deep_thinker_enabled: true
-""")
+                yaml.dump(cfg_data, f, default_flow_style=False, sort_keys=False)
 
         req_path = target_path / "requirements.txt"
         if not req_path.exists():
@@ -380,12 +389,26 @@ def chat(req: ChatRequest):
 
 
 # ═══════════ AGENT CONFIGURATION ═══════════
+@app.get("/api/agent/config")
+def get_agent_config():
+    return _current_agent_config
+
 @app.post("/api/agent/configure")
 def configure_agent(req: AgentConfigRequest):
     """Reconfigure the AI facade with new settings."""
-    global _ai_facade
+    global _ai_facade, _current_agent_config
     try:
         from smart_agent_arch.user_api import UserAIFacade
+
+        _current_agent_config = {
+            "provider": req.provider,
+            "model": req.model,
+            "api_key": req.api_key,
+            "base_url": req.base_url,
+            "temperature": req.temperature,
+            "mentorEnabled": req.mentorEnabled,
+            "deepThinkerEnabled": req.deepThinkerEnabled,
+        }
 
         config_dict: dict[str, Any] = {
             "provider": req.provider,

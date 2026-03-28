@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
 import { 
   FileCode, MessageSquare, Activity, Settings, 
-  Terminal as TerminalIcon, FolderTree, Plus, 
+  Terminal as TerminalIcon, FolderTree, 
   Cpu, Zap, Shield, ChevronRight, ChevronDown, 
-  X, Save, Play, Boxes, CheckCircle2, Layout, Send
+  X, Save, Play, Boxes, CheckCircle2, Layout, Send, Layers
 } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8000';
@@ -25,11 +25,9 @@ async function apiPost<T>(path: string, body: any): Promise<T> {
   return res.json();
 }
 
-// --- Types ---
 interface FileNode { name: string; path: string; type: 'file' | 'directory'; children?: FileNode[]; }
 interface ChatMessage { role: 'user' | 'assistant'; content: string; thinking?: string; }
 
-// --- Components ---
 const FileTreeNode = ({ node, onSelect }: { node: FileNode; onSelect: (path: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const isDir = node.type === 'directory';
@@ -49,76 +47,174 @@ const FileTreeNode = ({ node, onSelect }: { node: FileNode; onSelect: (path: str
   );
 };
 
-const SettingsModal = ({ config, onClose, onSave, isProjectWizard = false }: any) => {
-  const [name, setName] = useState('MyAgentProject');
-  const [path, setPath] = useState('');
-  const [model, setModel] = useState(config.model || 'gpt-4o');
-  const [provider, setProvider] = useState(config.provider || 'openai');
-  const [apiKey, setApiKey] = useState(config.api_key || '');
-  const [baseUrl, setBaseUrl] = useState(config.base_url || '');
-  const [temp, setTemp] = useState(config.temperature || 0.7);
+const SettingsModal = ({ defaultConf, onClose, onSave, isProjectWizard = false }: any) => {
+  const [tab, setTab] = useState('basic');
+  
+  // State initialization with advanced config keys
+  const [cfg, setCfg] = useState({
+    name: 'MySuperAgent',
+    path: '',
+    provider: defaultConf?.provider || 'openai',
+    model: defaultConf?.model || 'gpt-4o',
+    api_key: defaultConf?.api_key || '',
+    base_url: defaultConf?.base_url || '',
+    temperature: defaultConf?.temperature ?? 0.7,
+    top_p: 0.9,
+    max_response_length: 8000,
+    language: 'en',
+    tone: 'neutral',
+    verbose_level: 1,
+    mentor_enabled: true,
+    deep_thinker_enabled: true,
+    fast_memory_enabled: true,
+    memory_max_items: 100,
+    memory_retention_days: 30,
+    enable_logging: true,
+    log_level: 'INFO'
+  });
+
+  const update = (k: string, v: any) => setCfg(prev => ({ ...prev, [k]: v }));
 
   const handleSubmit = () => {
     if (isProjectWizard) {
-      onSave({ name, path, provider, model, api_key: apiKey, base_url: baseUrl, temperature: temp });
+      onSave(cfg);
     } else {
-      onSave({ provider, model, api_key: apiKey, base_url: baseUrl, temperature: temp, mentorEnabled: true, deepThinkerEnabled: true });
+      // Internal system agent config (mostly API / model details)
+      onSave({ 
+        provider: cfg.provider, model: cfg.model, 
+        api_key: cfg.api_key, base_url: cfg.base_url, 
+        temperature: cfg.temperature, 
+        mentorEnabled: cfg.mentor_enabled, deepThinkerEnabled: cfg.deep_thinker_enabled 
+      });
     }
   };
 
   return (
     <div className="modal-bg">
-      <div className="modal-content" style={{ width: '500px' }}>
+      <div className="modal-content" style={{ width: isProjectWizard ? '700px' : '450px' }}>
         <div className="modal-header">
-          <span>{isProjectWizard ? "Initialize New Agent Project" : "Agent Configuration"}</span>
+          <span>{isProjectWizard ? "Agent Blueprint / Advanced Config" : "System AI Configuration"}</span>
           <X size={18} style={{ cursor: 'pointer' }} onClick={onClose} />
         </div>
+        
+        {isProjectWizard && (
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--border-muted)', background: 'var(--bg-base)' }}>
+             {['basic', 'model', 'modules', 'memory', 'system'].map(t => (
+                <div key={t} onClick={() => setTab(t)} style={{ padding: '12px 16px', fontSize: '12px', cursor: 'pointer', textTransform: 'uppercase', color: tab === t ? 'var(--accent-base)' : 'var(--text-dim)', borderBottom: tab === t ? '2px solid var(--accent-base)' : '2px solid transparent' }}>
+                  {t}
+                </div>
+             ))}
+          </div>
+        )}
+
         <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-          {isProjectWizard && (
-            <>
+          {(!isProjectWizard || tab === 'basic') && isProjectWizard && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
               <div className="form-group">
                 <label>Project Name</label>
-                <input value={name} onChange={e => setName(e.target.value)} placeholder="MySuperAgent" />
+                <input value={cfg.name} onChange={e => update('name', e.target.value)} />
               </div>
               <div className="form-group">
-                <label>Creation Path (Empty for current root)</label>
-                <input value={path} onChange={e => setPath(e.target.value)} placeholder="./my_agent" />
+                <label>Target Path (Empty for current workspace)</label>
+                <input value={cfg.path} onChange={e => update('path', e.target.value)} placeholder="./my_agent" />
               </div>
-              <hr style={{ borderColor: 'var(--border-muted)', margin: '20px 0' }} />
-            </>
+            </div>
           )}
 
-          <div className="form-group">
-            <label>AI Provider</label>
-            <select value={provider} onChange={e => setProvider(e.target.value)}>
-              <option value="openai">OpenAI</option>
-              <option value="ollama">Ollama (Local)</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="mistral">Mistral AI</option>
-              <option value="custom">Custom Endpoint</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Model</label>
-            <input value={model} onChange={e => setModel(e.target.value)} placeholder="e.g. gpt-4o, llama3" />
-          </div>
-          <div className="form-group">
-            <label>API Key (Optional for local)</label>
-            <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." />
-          </div>
-          <div className="form-group">
-            <label>Base URL (Optional)</label>
-            <input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" />
-          </div>
-          <div className="form-group">
-            <label>Temperature ({temp})</label>
-            <input type="range" min="0" max="1" step="0.1" value={temp} onChange={e => setTemp(parseFloat(e.target.value))} />
-          </div>
+          {(!isProjectWizard || tab === 'model') && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                <label>AI Provider</label>
+                <select value={cfg.provider} onChange={e => update('provider', e.target.value)}>
+                  <option value="openai">OpenAI</option>
+                  <option value="ollama">Ollama (Local)</option>
+                  <option value="anthropic">Anthropic</option>
+                  <option value="mistral">Mistral AI</option>
+                  <option value="custom">Custom Endpoint</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Model</label>
+                <input value={cfg.model} onChange={e => update('model', e.target.value)} />
+              </div>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label>API Key</label>
+                <input type="password" value={cfg.api_key} onChange={e => update('api_key', e.target.value)} placeholder="sk-..." />
+              </div>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label>Base URL</label>
+                <input value={cfg.base_url} onChange={e => update('base_url', e.target.value)} placeholder="https://api.openai.com/v1" />
+              </div>
+              <div className="form-group">
+                <label>Temperature ({cfg.temperature})</label>
+                <input type="range" min="0" max="1" step="0.1" value={cfg.temperature} onChange={e => update('temperature', parseFloat(e.target.value))} />
+              </div>
+              {isProjectWizard && (
+                <div className="form-group">
+                  <label>Top P ({cfg.top_p})</label>
+                  <input type="range" min="0" max="1" step="0.1" value={cfg.top_p} onChange={e => update('top_p', parseFloat(e.target.value))} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {isProjectWizard && tab === 'modules' && (
+             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                 <input type="checkbox" checked={cfg.mentor_enabled} onChange={e => update('mentor_enabled', e.target.checked)} /> Enable AI Mentor Module
+               </label>
+               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                 <input type="checkbox" checked={cfg.deep_thinker_enabled} onChange={e => update('deep_thinker_enabled', e.target.checked)} /> Enable Deep Thinker Reasoning
+               </label>
+               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                 <input type="checkbox" checked={cfg.fast_memory_enabled} onChange={e => update('fast_memory_enabled', e.target.checked)} /> Enable Fast Memory Assist
+               </label>
+             </div>
+          )}
+
+          {isProjectWizard && tab === 'memory' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-group">
+                 <label>Language</label>
+                 <input value={cfg.language} onChange={e => update('language', e.target.value)} placeholder="en" />
+              </div>
+              <div className="form-group">
+                 <label>Max Response Length</label>
+                 <input type="number" value={cfg.max_response_length} onChange={e => update('max_response_length', parseInt(e.target.value))} />
+              </div>
+              <div className="form-group">
+                 <label>Memory Items Limit</label>
+                 <input type="number" value={cfg.memory_max_items} onChange={e => update('memory_max_items', parseInt(e.target.value))} />
+              </div>
+              <div className="form-group">
+                 <label>Memory Retention (Days)</label>
+                 <input type="number" value={cfg.memory_retention_days} onChange={e => update('memory_retention_days', parseInt(e.target.value))} />
+              </div>
+            </div>
+          )}
+
+          {isProjectWizard && tab === 'system' && (
+             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+               <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                 <input type="checkbox" checked={cfg.enable_logging} onChange={e => update('enable_logging', e.target.checked)} /> Enable Logging
+               </label>
+               <div className="form-group">
+                 <label>Log Level</label>
+                 <select value={cfg.log_level} onChange={e => update('log_level', e.target.value)}>
+                   <option value="DEBUG">Debug</option>
+                   <option value="INFO">Info</option>
+                   <option value="WARNING">Warning</option>
+                   <option value="ERROR">Error</option>
+                 </select>
+               </div>
+             </div>
+          )}
+
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSubmit}>
-            {isProjectWizard ? "Create & Scaffold" : "Save & Restart Kernel"}
+            {isProjectWizard ? "Scaffold AI Agent" : "Apply to System"}
           </button>
         </div>
       </div>
@@ -133,9 +229,10 @@ export default function App() {
   const [fileContent, setFileContent] = useState('');
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   
-  // Real Data State
   const [projectStats, setProjectStats] = useState<any>(null);
   const [agentStatus, setAgentStatus] = useState<any>(null);
+  const [internalAgentConfig, setInternalAgentConfig] = useState<any>(null);
+
   const [showConfig, setShowConfig] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -153,13 +250,19 @@ export default function App() {
       setProjectStats(s);
       const ag = await apiGet<any>('/api/agent/status');
       setAgentStatus(ag);
-    } catch (e) {
-      console.warn("Backend fetch failed", e);
-    }
+    } catch (e) { }
   }, []);
+
+  const fetchInternalConfig = async () => {
+    try {
+      const resp = await apiGet<any>('/api/agent/config');
+      setInternalAgentConfig(resp);
+    } catch(e) {}
+  };
 
   useEffect(() => {
     fetchState();
+    fetchInternalConfig();
     const t = setInterval(fetchState, 5000);
     return () => clearInterval(t);
   }, [fetchState]);
@@ -170,7 +273,7 @@ export default function App() {
       setFileContent(res.content || '');
       setActiveFile(path);
       if (!openTabs.includes(path)) setOpenTabs([...openTabs, path]);
-    } catch (e) { console.error("Could not load file"); }
+    } catch (e) { }
   };
 
   const closeTab = (e: any, path: string) => {
@@ -185,7 +288,7 @@ export default function App() {
     try {
        await apiPost('/api/file/save', { path: activeFile, content: fileContent });
        setTerminalLog(p => [...p, `[UI] Saved ${activeFile}`]);
-    } catch (e) { alert("Save failed"); }
+    } catch (e) { }
   };
 
   const handleRunScript = async () => {
@@ -201,14 +304,27 @@ export default function App() {
   };
 
   const createProject = async (cfg: any) => {
-    if (!cfg.path) cfg.path = `./${cfg.name.toLowerCase().replace(/\\s+/g, '_')}`;
+    const payload = {
+      name: cfg.name,
+      path: cfg.path ? cfg.path : `./${cfg.name.toLowerCase().replace(/\\s+/g, '_')}`,
+      config: cfg
+    };
     try {
-      const res = await apiPost<any>('/api/project/create', cfg);
+      const res = await apiPost<any>('/api/project/create', payload);
       setShowWizard(false);
       setTerminalLog(p => [...p, res.message || res.error]);
       fetchState();
       setView('explorer');
     } catch (e) { alert("Failed to create project"); }
+  };
+
+  const saveInternalConfig = async (cfg: any) => {
+    try {
+      await apiPost('/api/agent/configure', cfg);
+      setShowConfig(false);
+      fetchInternalConfig();
+      setTerminalLog(p => [...p, "[System] AI Kernel reconfigured"]);
+    } catch (e) { alert("Failed to configure AI"); }
   };
 
   const handleChat = async () => {
@@ -238,22 +354,13 @@ export default function App() {
     }
   };
 
-  const saveConfig = async (cfg: any) => {
-    try {
-      await apiPost('/api/agent/configure', cfg);
-      setShowConfig(false);
-      fetchState();
-    } catch (e) { alert("Failed to configure AI"); }
-  };
-
   const getLang = (path: string) => {
       const ext = path.split('.').pop() || '';
-      return { tsx: 'typescript', ts: 'typescript', js: 'javascript', py: 'python', css: 'css', html: 'html', json: 'json', yml: 'yaml', yaml: 'yaml' }[ext] || 'plaintext';
+      return { tsx: 'typescript', ts: 'typescript', js: 'javascript', py: 'python', css: 'css', html: 'html', json: 'json', yml: 'yaml', yaml: 'yaml', txt: 'plaintext' }[ext] || 'plaintext';
   };
 
   return (
     <div className="app-layout">
-      {/* Activity Bar */}
       <div className="activity-bar">
         <div className={`action-btn ${view === 'home' ? 'active' : ''}`} onClick={() => setView('home')} title="Dashboard">
           <Layout size={22} />
@@ -264,9 +371,7 @@ export default function App() {
         <div className={`action-btn ${view === 'chat' ? 'active' : ''}`} onClick={() => setView('chat')} title="Built-in AI Assistant">
           <MessageSquare size={22} />
         </div>
-        
         <div className="spacer" />
-        
         <div className={`action-btn ${terminalOpen ? 'active' : ''}`} onClick={() => setTerminalOpen(!terminalOpen)} title="Terminal">
           <TerminalIcon size={22} />
         </div>
@@ -277,14 +382,9 @@ export default function App() {
 
       <div className="main-area">
         <div className="workspace-container">
-          
-          {/* Side Panel */}
           {(view === 'explorer' || view === 'chat') && (
             <div className="sidebar-panel">
-              <div className="sidebar-header">
-                {view === 'explorer' ? 'Explorer' : 'AI Assistant'}
-              </div>
-              
+              <div className="sidebar-header">{view === 'explorer' ? 'Explorer' : 'AI Assistant'}</div>
               <div className="sidebar-content">
                 {view === 'explorer' && files.map(n => <FileTreeNode key={n.path} node={n} onSelect={handleSelectFile} />)}
                 
@@ -315,7 +415,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Central Area */}
           <div className="content-view">
             {activeFile ? (
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -327,7 +426,6 @@ export default function App() {
                     </div>
                   ))}
                   <div style={{ flex: 1 }} />
-                  {/* Action Buttons above Editor */}
                   <div style={{ display: 'flex', alignItems: 'center', paddingRight: '16px', gap: '8px' }}>
                     <button className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px' }} onClick={handleRunScript}>
                        <Play size={14} /> Run
@@ -335,14 +433,7 @@ export default function App() {
                   </div>
                 </div>
                 <div style={{ flex: 1, position: 'relative' }}>
-                  <Editor
-                    theme="vs-dark"
-                    language={getLang(activeFile)}
-                    path={activeFile}
-                    value={fileContent}
-                    onChange={v => setFileContent(v || '')}
-                    options={{ minimap: { enabled: false }, fontSize: 13, padding: { top: 16 } }}
-                  />
+                  <Editor theme="vs-dark" language={getLang(activeFile)} path={activeFile} value={fileContent} onChange={v => setFileContent(v || '')} options={{ minimap: { enabled: false }, fontSize: 13, padding: { top: 16 } }} />
                   <button className="floating-save" onClick={handleSave}><Save size={20}/></button>
                 </div>
               </div>
@@ -355,11 +446,11 @@ export default function App() {
 
                 <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--accent-glow)', borderColor: 'var(--accent-base)' }}>
                   <div>
-                    <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>Create an AI Agent</h2>
-                    <p style={{ margin: 0, color: 'var(--text-main)', opacity: 0.8 }}>No need to code everything from scratch. Configure endpoints, memory, and thoughts here.</p>
+                    <h2 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>Advanced Agent Blueprint</h2>
+                    <p style={{ margin: 0, color: 'var(--text-main)', opacity: 0.8 }}>Design incredibly powerful AI agents via our advanced configuration system, fully abstracted from the code.</p>
                   </div>
                   <button className="btn btn-primary" onClick={() => setShowWizard(true)} style={{ padding: '12px 24px', fontSize: '15px' }}>
-                    <Plus size={18} style={{ verticalAlign: 'middle', marginRight: '6px' }}/> New Agent
+                    <Layers size={18} style={{ verticalAlign: 'middle', marginRight: '6px' }}/> Open Studio
                   </button>
                 </div>
 
@@ -382,7 +473,7 @@ export default function App() {
                 </div>
 
                 <div className="glass-card">
-                  <h3 style={{ marginTop: 0, marginBottom: 20, color: 'var(--text-muted)', fontSize: 14 }}>Built-in AI Kernel Status</h3>
+                  <h3 style={{ marginTop: 0, marginBottom: 20, color: 'var(--text-muted)', fontSize: 14 }}>System Engine Status</h3>
                   <div className="stats-row">
                     <div className="stat-item">
                       <div className="stat-icon" style={{ background: agentStatus?.state === 'ready' ? 'rgba(16,185,129,0.2)' : 'var(--bg-elevated)', color: agentStatus?.state === 'ready' ? 'var(--success)' : 'var(--text-dim)' }}><Cpu size={24} /></div>
@@ -403,7 +494,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Terminal Dock */}
         {terminalOpen && (
           <div className="bottom-dock">
             <div className="dock-header">
@@ -429,8 +519,8 @@ export default function App() {
         </div>
       </div>
 
-      {showConfig && <SettingsModal config={{}} onClose={() => setShowConfig(false)} onSave={saveConfig} />}
-      {showWizard && <SettingsModal config={{}} isProjectWizard={true} onClose={() => setShowWizard(false)} onSave={createProject} />}
+      {showConfig && internalAgentConfig && <SettingsModal defaultConf={internalAgentConfig} onClose={() => setShowConfig(false)} onSave={saveInternalConfig} />}
+      {showWizard && <SettingsModal isProjectWizard={true} onClose={() => setShowWizard(false)} onSave={createProject} />}
     </div>
   );
 }
