@@ -4,7 +4,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, Callable
 
 from smart_agent_arch.agent_contract import AgentContract
 from smart_agent_arch.command_parser import ConfigCommandParser
@@ -152,7 +152,7 @@ class UserAIFacade:
         self._hooks = HookManager()
 
         # Attach file logger if configured
-        if self._full_config.logging.log_file:
+        if self._full_config and self._full_config.logging.log_file:
             logger = FileLogger(self._full_config.logging.log_file)
             for kind in EventKind:
                 self._hooks.subscribe(kind, logger)
@@ -265,7 +265,7 @@ class UserAIFacade:
 
     def register_hook(self, kind: EventKind, callback: Callable) -> None:
         """Register a custom hook for agent lifecycle events."""
-        self._hooks.register(kind, callback)
+        self._hooks.subscribe(kind, callback)
 
     @property
     def config(self) -> dict[str, Any]:
@@ -338,12 +338,10 @@ class UserAIFacade:
 
     def append_ai_events(self, events: list[dict[str, str]]) -> None:
         """Adds summarized AI-generated events to cache without storing raw chat logs."""
-
         self._event_cache.add_many(events)
 
     def append_ai_memories(self, memories: list[dict[str, Any]]) -> int:
         """Adds important AI-selected memories into long-term memory."""
-
         added = self._long_memory.add_many(memories)
         if added:
             self._event_cache.add(kind="memory", summary=f"Stored {added} long-memory items")
@@ -351,7 +349,6 @@ class UserAIFacade:
 
     def append_user_preferences(self, preferences: list[dict[str, Any]]) -> int:
         """Stores important user preferences in long-term memory."""
-
         added = self._long_memory.add_preferences(preferences)
         if added:
             self._event_cache.add(kind="memory", summary=f"Stored {added} user preferences")
@@ -359,7 +356,6 @@ class UserAIFacade:
 
     def append_knowledge(self, knowledge_items: list[dict[str, Any]]) -> int:
         """Stores important knowledge items in long-term memory."""
-
         added = self._long_memory.add_knowledge(knowledge_items)
         if added:
             self._event_cache.add(kind="memory", summary=f"Stored {added} knowledge items")
@@ -367,7 +363,6 @@ class UserAIFacade:
 
     def submit_deep_task(self, task_text: str, source: str = "manual") -> None:
         """Submit a complex task for deep-thinker AI to solve in background until verified."""
-
         self._assist_with_fast_memory(topic=task_text, source_component="third_ai")
         self._deep_thinker.submit_task(task_text=task_text, source=source)
         self._event_cache.add(kind="thinker", summary=f"Deep task assigned by {source}")
@@ -385,7 +380,6 @@ class UserAIFacade:
 
     def runtime_context(self) -> dict[str, Any]:
         """Returns current time plus compact event list for model-side context."""
-
         event_context = self._event_cache.build_model_context()
         memory_context = self._long_memory.build_context()
         contract = self._agent_contract.to_context()
@@ -797,21 +791,8 @@ def initialize_ai(config: dict[str, Any] | FullConfig | str | Path, runtime_gate
         return UserAIFacade(config=config, runtime_gateway=runtime_gateway)
 
     if isinstance(config, (str, Path)):
-        path = Path(config)
-        suffix = path.suffix.lower()
-        if suffix in {".yaml", ".yml"}:
-            loaded = ConfigLoader.from_yaml(path)
-            return UserAIFacade(config=loaded, runtime_gateway=runtime_gateway)
-        if suffix == ".json":
-            loaded = ConfigLoader.from_json(path)
-            return UserAIFacade(config=loaded, runtime_gateway=runtime_gateway)
-        if suffix == ".py":
-            loaded = ConfigLoader.from_python_module(path)
-            return UserAIFacade(config=loaded, runtime_gateway=runtime_gateway)
-        raise ConfigurationError(
-            "Unsupported config file extension. Use .yaml/.yml, .json, or .py"
-        )
+        from smart_agent_arch.config_loader import ConfigLoader
+        full_config = ConfigLoader.from_file(config)
+        return UserAIFacade(config=full_config, runtime_gateway=runtime_gateway)
 
-    raise ConfigurationError(
-        "config must be dict, FullConfig, or a path to .yaml/.yml/.json/.py"
-    )
+    raise ConfigurationError(f"Unsupported config type: {type(config)}")

@@ -123,10 +123,16 @@ def gui_cmd():
         console.print(f"[red]❌ Error: Desktop app not found at {app_path}[/red]")
         return
         
+    dist_path = project_root / "desktop_app" / "frontend" / "dist"
+    if not dist_path.exists():
+        console.print("[yellow]⚠ Warning: GUI Frontend build (dist folder) not found.[/yellow]")
+        console.print("[dim]Run 'npm run build' in desktop_app/frontend to enable production UI.[/dim]\n")
+
     console.print(Panel("🌐 [bold magenta]NexLab GUI:[/bold magenta] Launching Native Desktop App...", expand=False))
     try:
-        subprocess.Popen([sys.executable, str(app_path)], cwd=str(project_root), shell=(sys.platform == "win32"))
+        subprocess.Popen([sys.executable, str(app_path)], cwd=str(project_root), shell=(sys.platform == "win32"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         console.print("🚀 [green]GUI command sent. The application window should appear shortly.[/green]")
+        console.print("[dim]Logs available in nexlab_gui.log and nexlab_error.log[/dim]")
     except Exception as e:
         console.print(f"[red]❌ Error launching GUI:[/red] {e}")
 

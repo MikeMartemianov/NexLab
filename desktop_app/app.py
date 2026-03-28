@@ -96,17 +96,26 @@ def main():
                 f.write(crash_info)
         sys.exit(1)
 
-    # Choose the URL: built dist served by FastAPI, or Vite dev server
+    # ═══════════ FRONTEND RESOLUTION ═══════════
     # In frozen mode, check bundled dist
     dist_check = os.path.join(BASE_DIR, "desktop_app", "frontend", "dist", "index.html")
-    # In dev mode, check relative to script
+    # In dev mode, check relative to current script
     if not os.path.exists(dist_check):
         dist_check = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist", "index.html")
 
-    if os.path.exists(dist_check):
-        url = f"http://127.0.0.1:{PORT}"
-    else:
-        url = DEV_FRONTEND_URL
+    log_path = os.path.join(os.getcwd(), "nexlab_gui.log")
+    with open(log_path, "a") as log:
+        log.write(f"[{time.ctime()}] Starting NexLab GUI...\n")
+        log.write(f"[{time.ctime()}] PROJECT_ROOT: {PROJECT_ROOT}\n")
+        log.write(f"[{time.ctime()}] BASE_DIR: {BASE_DIR}\n")
+        
+        if os.path.exists(dist_check):
+            url = f"http://127.0.0.1:{PORT}"
+            log.write(f"[{time.ctime()}] Found production build at {dist_check}. Using URL: {url}\n")
+        else:
+            url = DEV_FRONTEND_URL
+            log.write(f"[{time.ctime()}] UI build missing at {dist_check}. Defaulting to Dev Server: {url}\n")
+            log.write(f"[{time.ctime()}] NOTE: If the window is blank or shows 404, run 'npm run dev' in desktop_app/frontend or build the UI.\n")
 
     # Try to use pywebview for a native window
     try:
