@@ -8,6 +8,24 @@ from typing import Any
 from smart_agent_arch.config_loader import FullConfig, ModelProviderConfig
 from smart_agent_arch.exceptions import ConfigurationError
 
+def _sanitize_base_url(url: str | None) -> str | None:
+    """Strip redundant suffixes from base_url to prevent double-appends."""
+    if not url:
+        return url
+    
+    url = url.rstrip("/")
+    suffixes = ["/chat/completions", "/v1", "/api/chat"]
+    
+    changed = True
+    while changed:
+        changed = False
+        for s in suffixes:
+            if url.endswith(s):
+                url = url[:-len(s)].rstrip("/")
+                changed = True
+                break
+    return url
+
 
 class ModelProvider(ABC):
     """Abstract base for model provider implementations."""
@@ -40,7 +58,7 @@ class OpenAIProvider(ModelProvider):
         self.config = config
         self.api_key = config.api_key
         self.model = config.model
-        self.base_url = config.base_url or "https://api.openai.com/v1"
+        self.base_url = _sanitize_base_url(config.base_url) or "https://api.openai.com/v1"
         self._client = None
 
     async def complete(
@@ -116,7 +134,7 @@ class OllamaProvider(ModelProvider):
     def __init__(self, config: ModelProviderConfig) -> None:
         self.config = config
         self.model = config.model
-        self.base_url = config.base_url or "http://localhost:11434"
+        self.base_url = _sanitize_base_url(config.base_url) or "http://localhost:11434"
 
     async def complete(
         self,

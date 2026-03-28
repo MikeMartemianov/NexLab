@@ -54,10 +54,13 @@ class LiveRuntimeGateway:
                 metadata={"media_type": envelope.media_type, "provider": full_config.model_provider.provider}
             )
         except Exception as e:
+            msg = str(e)
+            if "404" in msg:
+                msg += " (Hint: Double check if 'provider' matches your 'base_url'. Cerebras/Groq/etc. use 'openai' provider, not 'ollama')"
             return RuntimeResponse(
                 status="error", 
-                content=f"Model Gateway Error: {str(e)}", 
-                metadata={"error": str(e), "media_type": envelope.media_type}
+                content=f"Model Gateway Error: {msg}", 
+                metadata={"error": msg, "media_type": envelope.media_type}
             )
 
 
