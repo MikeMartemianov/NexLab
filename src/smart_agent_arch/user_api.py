@@ -232,13 +232,25 @@ class UserAIFacade:
         if not self._components_started:
             self._start_components()
 
-    def diagnostics(self, last_n: int = 20) -> None:
-        """Prints a beautiful diagnostic report of recent events and model performance."""
+    def diagnostics(self, last_n: int = 20) -> list[dict[str, Any]]:
+        """Returns a list of recent diagnostic events for UI display."""
+        events = self._event_cache.events()[-last_n:]
+        results = []
+        for e in events:
+            results.append({
+                "timestamp": getattr(e, "timestamp", str(time.time())),
+                "kind": getattr(e, "kind", "system"),
+                "summary": getattr(e, "summary", "No details"),
+                "repeats": getattr(e, "repeats", 1)
+            })
+        return results
+
+    def print_diagnostics(self, last_n: int = 20) -> None:
+        """Prints a beautiful diagnostic report of recent events."""
         try:
             from rich.console import Console
             from rich.table import Table
             from rich.panel import Panel
-            import time
         except ImportError:
             print("Rich library not installed. Cannot show beautiful diagnostics.")
             return
@@ -250,15 +262,14 @@ class UserAIFacade:
         table.add_column("Event", style="magenta")
         table.add_column("Details", style="white")
 
-        events = self._event_cache.events()[-last_n:]
+        events = self.diagnostics(last_n)
         for e in events:
-            # EventRecord uses ISO string timestamp
-            ts_str = getattr(e, "timestamp", str(time.time()))
+            ts = e["timestamp"].split("T")[-1][:8] if "T" in e["timestamp"] else str(e["timestamp"])
             table.add_row(
-                ts_str.split("T")[-1][:8], # HH:MM:SS
-                getattr(e, "kind", "system"),
-                getattr(e, "summary", "No details"),
-                "" # Metadata is not in EventRecord but we can add it later if needed
+                ts,
+                e["kind"],
+                e["summary"],
+                f"x{e['repeats']}" if e["repeats"] > 1 else ""
             )
 
         console.print(Panel(table, title="[bold green]System Health Status[/bold green]", expand=False))

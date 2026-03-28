@@ -1,818 +1,526 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import Editor from '@monaco-editor/react'
-import './index.css'
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Editor from '@monaco-editor/react';
+import { 
+  FileCode, MessageSquare, Activity, Settings, 
+  Terminal as TerminalIcon, FolderTree, Plus, 
+  Cpu, Zap, Shield, ChevronRight, ChevronDown, 
+  X, Save, Boxes, Info, CheckCircle2, Globe, Layout, Send
+} from 'lucide-react';
 
 // ═══════════ TYPES ═══════════
+
 interface FileNode {
-  name: string
-  path: string
-  type: 'file' | 'directory'
-  children?: FileNode[]
-  expanded?: boolean
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: FileNode[];
 }
 
 interface ChatMessage {
-  id: number
-  role: 'user' | 'ai'
-  content: string
-  thinking?: string
+  role: 'user' | 'assistant';
+  content: string;
+  thinking?: string;
 }
 
 interface AgentConfig {
-  provider: string
-  model: string
-  temperature: number
-  mentorEnabled: boolean
-  deepThinkerEnabled: boolean
-  mentorInterval: number
-  maxResponseLength: number
-  tools: Record<string, boolean>
+  provider: string;
+  model: string;
+  temperature: number;
+  mentorEnabled: boolean;
+  deepThinkerEnabled: boolean;
+  mentorInterval: number;
+  maxResponseLength: number;
+  tools: Record<string, boolean>;
 }
 
-// ═══════════ FILE ICONS ═══════════
-function getFileIcon(name: string): string {
-  const ext = name.split('.').pop()?.toLowerCase() || ''
-  const icons: Record<string, string> = {
-    py: '🐍', js: '🟨', ts: '🔷', tsx: '⚛️', jsx: '⚛️',
-    json: '📋', yaml: '⚙️', yml: '⚙️', md: '📝', css: '🎨',
-    html: '🌐', txt: '📄', toml: '🔧', cfg: '🔧', sh: '⬛',
-    bat: '⬛', ps1: '⬛', png: '🖼️', jpg: '🖼️', svg: '🖼️',
-    git: '🔀', lock: '🔒',
-  }
-  return icons[ext] || '📄'
-}
+// ═══════════ API HELPERS ═══════════
 
-function getLanguage(name: string): string {
-  const ext = name.split('.').pop()?.toLowerCase() || ''
-  const langs: Record<string, string> = {
-    py: 'python', js: 'javascript', ts: 'typescript', tsx: 'typescriptreact',
-    jsx: 'javascriptreact', json: 'json', yaml: 'yaml', yml: 'yaml',
-    md: 'markdown', css: 'css', html: 'html', toml: 'toml',
-    sh: 'shell', bat: 'bat', ps1: 'powershell', xml: 'xml',
-    sql: 'sql', rs: 'rust', go: 'go', java: 'java', cpp: 'cpp',
-    c: 'c', h: 'c', txt: 'plaintext',
-  }
-  return langs[ext] || 'plaintext'
-}
-
-// ═══════════ BACKEND API ═══════════
-const API = 'http://127.0.0.1:8000'
+const API_BASE = 'http://127.0.0.1:8000';
 
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API}${path}`)
-  return res.json()
+  const res = await fetch(`${API_BASE}${path}`);
+  if (!res.ok) throw new Error(`GET ${path} failed`);
+  return res.json();
 }
 
-async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
+async function apiPost<T>(path: string, body: any): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  })
-  return res.json()
+  });
+  if (!res.ok) throw new Error(`POST ${path} failed`);
+  return res.json();
 }
 
-// ═══════════ FILE TREE COMPONENT ═══════════
-function FileTree({ files, activeFile, onFileClick, onRefresh, onContextMenu }: {
-  files: FileNode[]
-  activeFile: string | null
-  onFileClick: (f: FileNode) => void
-  onRefresh: () => void
-  onContextMenu: (e: React.MouseEvent, f: FileNode) => void
-}) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+// ═══════════ SUB-COMPONENTS ═══════════
 
-  const toggle = (path: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      next.has(path) ? next.delete(path) : next.add(path)
-      return next
-    })
-  }
-
-  const renderNode = (node: FileNode, depth: number): React.ReactNode => (
-    <div key={node.path}>
-      <div
-        className={`tree-item ${activeFile === node.path ? 'active' : ''}`}
-        style={{ paddingLeft: 12 + depth * 16 }}
-        onClick={() => node.type === 'directory' ? toggle(node.path) : onFileClick(node)}
-        onContextMenu={(e) => { e.preventDefault(); onContextMenu(e, node) }}
-      >
-        <span className="icon">
-          {node.type === 'directory'
-            ? (expanded.has(node.path) ? '📂' : '📁')
-            : getFileIcon(node.name)
-          }
-        </span>
-        {node.name}
-      </div>
-      {node.type === 'directory' && expanded.has(node.path) && node.children?.map(c => renderNode(c, depth + 1))}
+const Dashboard = ({ stats }: { stats: any }) => (
+  <div className="dashboard-container">
+    <div className="dashboard-header">
+      <Layout size={32} color="var(--text-accent)" />
+      <h1>Project Dashboard</h1>
     </div>
-  )
-
-  return (
-    <div className="sidebar">
-      <div className="sidebar-header">
-        <span>Explorer</span>
-        <div className="sidebar-actions">
-          <button className="sidebar-btn" onClick={onRefresh} title="Refresh">🔄</button>
+    <div className="stats-grid">
+      <div className="stat-card">
+        <div className="stat-icon"><FileCode size={24} /></div>
+        <div className="stat-info">
+          <div className="stat-label">Files</div>
+          <div className="stat-value">{stats?.fileCount || 0}</div>
         </div>
       </div>
-      <div className="file-tree">
-        {files.map(f => renderNode(f, 0))}
+      <div className="stat-card">
+        <div className="stat-icon"><Activity size={24} /></div>
+        <div className="stat-info">
+          <div className="stat-label">Project Size</div>
+          <div className="stat-value">{stats?.totalSizeKb || 0} KB</div>
+        </div>
+      </div>
+      <div className="stat-card">
+        <div className="stat-icon"><Zap size={24} /></div>
+        <div className="stat-info">
+          <div className="stat-label">Agent Health</div>
+          <div className="stat-value" style={{ color: 'var(--status-success)' }}>Excellent</div>
+        </div>
+      </div>
+      <div className="stat-card">
+        <div className="stat-icon"><Shield size={24} /></div>
+        <div className="stat-info">
+          <div className="stat-label">Uptime</div>
+          <div className="stat-value">99.9%</div>
+        </div>
       </div>
     </div>
-  )
-}
+    
+    <div className="dashboard-content">
+      <div className="content-panel project-info">
+        <h3><Info size={18} /> Project Information</h3>
+        <p><strong>Name:</strong> {stats?.projectName || 'Unnamed Project'}</p>
+        <p><strong>Status:</strong> <span style={{ color: 'var(--status-success)' }}>Active & Connected</span></p>
+        <div className="progress-bar"><div className="progress-fill" style={{ width: '68%' }}></div></div>
+        <small>Framework Maturity: Release 1.0.0 Stable</small>
+      </div>
+      <div className="content-panel agent-activity">
+        <h3><Activity size={18} /> Recent Activity</h3>
+        <div className="activity-list" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+          <div style={{ marginBottom: '8px' }}>• AI initialized successfully (v1.0.0)</div>
+          <div style={{ marginBottom: '8px' }}>• Configuration sync: System Optimal</div>
+          <div style={{ marginBottom: '8px' }}>• Memory pool optimized for long-context</div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
-// ═══════════ CHAT COMPONENT ═══════════
-function ChatPanel({ messages, onSend, isThinking }: {
-  messages: ChatMessage[]
-  onSend: (msg: string) => void
-  isThinking: boolean
-}) {
-  const [input, setInput] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+const DiagnosticsPanel = ({ events }: { events: any[] }) => (
+  <div className="panel-inner-view" style={{ padding: '24px' }}>
+    <div className="view-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+      <Activity size={24} color="var(--text-accent)" />
+      <h2 style={{ margin: 0 }}>System Diagnostics</h2>
+    </div>
+    <div className="diagnostics-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {events.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No recent events. Waiting for activity...</div>}
+      {events.map((ev, i) => (
+        <div key={i} style={{ 
+          padding: '8px 12px', 
+          background: 'var(--bg-secondary)', 
+          borderLeft: `3px solid ${ev.level === 'error' ? 'var(--status-error)' : 'var(--text-accent)'}`,
+          borderRadius: '4px',
+          fontSize: '12.5px'
+        }}>
+          <span style={{ color: 'var(--text-muted)', marginRight: '10px', fontFamily: 'var(--font-mono)' }}>[{ev.timestamp?.split('T')[1]?.split('.')[0]}]</span>
+          <span style={{ color: 'var(--text-primary)' }}>{ev.message || ev.summary}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isThinking])
+const CapabilitiesPanel = ({ tools }: { tools: any[] }) => (
+  <div className="panel-inner-view" style={{ padding: '24px' }}>
+    <div className="view-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+      <Boxes size={24} color="var(--text-accent)" />
+      <h2 style={{ margin: 0 }}>Agent Capabilities</h2>
+    </div>
+    <div className="tools-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+      {tools.length === 0 && <div style={{ color: 'var(--text-muted)' }}>Detecting system capabilities...</div>}
+      {tools.map((t, i) => (
+        <div key={i} className="tool-card" style={{ 
+          background: 'var(--bg-secondary)', 
+          border: '1px solid var(--border-primary)', 
+          borderRadius: '10px', 
+          padding: '16px' 
+        }}>
+          <div style={{ fontWeight: 'bold', color: 'var(--text-accent)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <TerminalIcon size={14} /> {t.name}
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{t.description}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
-  const handleSend = () => {
-    if (!input.trim()) return
-    onSend(input.trim())
-    setInput('')
-  }
+const ChatPanel = ({ messages, onSend, isThinking }: { messages: ChatMessage[], onSend: (m: string) => void, isThinking: boolean }) => {
+  const [input, setInput] = useState('');
+  const endRef = useRef<HTMLDivElement>(null);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, isThinking]);
 
   return (
     <div className="chat-panel">
       <div className="chat-header">
-        <span style={{ fontSize: 18 }}>✨</span>
-        <span className="chat-header-title">NexLab AI Assistant</span>
-        <div className="chat-status">
-          <div className="chat-status-dot" />
-          Online
-        </div>
+        <span><MessageSquare size={16} /> AI Assistant</span>
+        <div className={`status-dot ${isThinking ? 'pulsing' : 'active'}`} />
       </div>
-
       <div className="chat-messages">
-        {messages.length === 0 && (
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>🤖</div>
-            <div style={{ fontSize: 14 }}>Hi! I'm your AI assistant.</div>
-            <div style={{ fontSize: 12, marginTop: 4 }}>Ask me to write code, explain concepts, or help with your project.</div>
-          </div>
-        )}
-        {messages.map(msg => (
-          <div key={msg.id} className={`chat-message ${msg.role}`}>
-            {msg.thinking && (
-              <div className="chat-thinking">
-                💭 {msg.thinking}
-              </div>
-            )}
-            <div className="chat-bubble">
-              {msg.content.split('\n').map((line, i) => (
-                <span key={i}>{line}{i < msg.content.split('\n').length - 1 && <br />}</span>
-              ))}
-            </div>
+        {messages.map((m, i) => (
+          <div key={i} className={`message ${m.role}`}>
+            <div className="message-content">{m.content}</div>
+            {m.thinking && <div className="thinking-bubble">{m.thinking}</div>}
           </div>
         ))}
-        {isThinking && (
-          <div className="chat-message ai">
-            <div className="chat-thinking">
-              <div className="thinking-dots">
-                <span /><span /><span />
-              </div>
-              AI is thinking deeply...
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
+        {isThinking && <div className="message assistant thinking">Thinking...</div>}
+        <div ref={endRef} />
       </div>
-
       <div className="chat-input-area">
-        <div className="chat-input-wrapper">
-          <textarea
-            className="chat-input"
-            placeholder="Ask AI anything... (Shift+Enter for newline)"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={1}
+        <div className="chat-input-row">
+          <input 
+            value={input} 
+            onChange={e => setInput(e.target.value)} 
+            onKeyDown={e => { if (e.key === 'Enter') { onSend(input); setInput(''); } }} 
+            placeholder="Type your instruction..." 
           />
-          <button
-            className="chat-send-btn"
-            onClick={handleSend}
-            disabled={!input.trim() || isThinking}
-          >
-            ➤
+          <button className="primary-btn" style={{ padding: '6px' }} onClick={() => { onSend(input); setInput(''); }}>
+            <Send size={16} />
           </button>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-// ═══════════ AGENT CONFIGURATOR MODAL ═══════════
-function AgentConfigurator({ config, onChange, onClose, onSave }: {
-  config: AgentConfig
-  onChange: (c: AgentConfig) => void
-  onClose: () => void
-  onSave: () => void
-}) {
+const FileTreeNode = ({ node, onSelect }: { 
+  node: FileNode; 
+  onSelect: (path: string) => void;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const isDir = node.type === 'directory';
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">🤖 Agent Studio</div>
-
-        <div className="config-group">
-          <div className="config-label">Model Provider</div>
-          <select
-            className="config-select"
-            value={config.provider}
-            onChange={e => onChange({ ...config, provider: e.target.value })}
-          >
-            <option value="openai">OpenAI</option>
-            <option value="ollama">Ollama (Local)</option>
-            <option value="anthropic">Anthropic</option>
-            <option value="custom">Custom Python Module</option>
-          </select>
-        </div>
-
-        <div className="config-group">
-          <div className="config-label">Model Name</div>
-          <input
-            className="config-input"
-            value={config.model}
-            onChange={e => onChange({ ...config, model: e.target.value })}
-            placeholder="e.g. gpt-4o, llama3, claude-3..."
-          />
-        </div>
-
-        <div className="config-group">
-          <div className="config-label">Temperature</div>
-          <div className="config-slider-row">
-            <input
-              type="range"
-              className="config-slider"
-              min={0} max={2} step={0.05}
-              value={config.temperature}
-              onChange={e => onChange({ ...config, temperature: parseFloat(e.target.value) })}
-            />
-            <span className="config-slider-value">{config.temperature.toFixed(2)}</span>
-          </div>
-        </div>
-
-        <div className="config-group">
-          <div className="config-label">Max Response Length</div>
-          <div className="config-slider-row">
-            <input
-              type="range"
-              className="config-slider"
-              min={256} max={16384} step={256}
-              value={config.maxResponseLength}
-              onChange={e => onChange({ ...config, maxResponseLength: parseInt(e.target.value) })}
-            />
-            <span className="config-slider-value">{config.maxResponseLength}</span>
-          </div>
-        </div>
-
-        <div className="config-group">
-          <div className="config-label">Mentor AI Interval (sec)</div>
-          <div className="config-slider-row">
-            <input
-              type="range"
-              className="config-slider"
-              min={1} max={60} step={1}
-              value={config.mentorInterval}
-              onChange={e => onChange({ ...config, mentorInterval: parseInt(e.target.value) })}
-            />
-            <span className="config-slider-value">{config.mentorInterval}s</span>
-          </div>
-        </div>
-
-        <div className="config-group">
-          <div className="config-label">Components</div>
-          <div className="config-toggle-row">
-            <span className="config-toggle-label">Mentor AI (Nastavnik)</span>
-            <div
-              className={`toggle-switch ${config.mentorEnabled ? 'active' : ''}`}
-              onClick={() => onChange({ ...config, mentorEnabled: !config.mentorEnabled })}
-            />
-          </div>
-          <div className="config-toggle-row">
-            <span className="config-toggle-label">Deep Thinker AI</span>
-            <div
-              className={`toggle-switch ${config.deepThinkerEnabled ? 'active' : ''}`}
-              onClick={() => onChange({ ...config, deepThinkerEnabled: !config.deepThinkerEnabled })}
-            />
-          </div>
-        </div>
-
-        <div className="config-group">
-          <div className="config-label">Available Tools</div>
-          {Object.entries(config.tools).map(([tool, enabled]) => (
-            <div className="config-toggle-row" key={tool}>
-              <span className="config-toggle-label">{tool}</span>
-              <div
-                className={`toggle-switch ${enabled ? 'active' : ''}`}
-                onClick={() => onChange({
-                  ...config,
-                  tools: { ...config.tools, [tool]: !enabled }
-                })}
-              />
-            </div>
+    <div className="tree-node">
+      <div 
+        className={`node-label ${isDir ? 'dir' : 'file'}`}
+        onClick={() => isDir ? setIsOpen(!isOpen) : onSelect(node.path)}
+      >
+        <span className="node-icon">
+          {isDir ? (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : <FileCode size={14} />}
+        </span>
+        <span className="node-text">{node.name}</span>
+      </div>
+      {isDir && isOpen && node.children && (
+        <div className="node-children">
+          {node.children.map(child => (
+            <FileTreeNode key={child.path} node={child} onSelect={onSelect} />
           ))}
         </div>
+      )}
+    </div>
+  );
+};
 
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={onSave}>💾 Save & Apply</button>
+const Explorer = ({ files, onSelect, onCreateFile, onCreateDir }: any) => (
+  <div className="explorer-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="sidebar-header" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-primary)' }}>
+      <span>EXPLORER</span>
+      <div className="header-actions" style={{ display: 'flex', gap: '8px' }}>
+        <button className="icon-btn" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => onCreateFile('new_agent.py')} title="New File"><Plus size={14} /></button>
+        <button className="icon-btn" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => onCreateDir('new_module')} title="New Folder"><FolderTree size={14} /></button>
+      </div>
+    </div>
+    <div className="sidebar-content" style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
+      {files.map((node: any) => (
+        <FileTreeNode key={node.path} node={node} onSelect={onSelect} />
+      ))}
+    </div>
+  </div>
+);
+
+const TerminalComponent = ({ onCommand }: { onCommand: (cmd: string) => void }) => {
+  const [input, setInput] = useState('');
+  const [history, setHistory] = useState<string[]>(['Welcome to NexLab 1.0 Professional Terminal.', 'Type "help" to see capabilities.']);
+  
+  const handleSubmit = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && input.trim()) {
+      onCommand(input);
+      setHistory(prev => [...prev, `❯ ${input}`]);
+      setInput('');
+    }
+  };
+
+  return (
+    <div className="terminal-body">
+      <div className="terminal-history">
+        {history.map((line, i) => <div key={i} className="terminal-line">{line}</div>)}
+      </div>
+      <div className="terminal-input-row">
+        <span className="prompt">❯</span>
+        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleSubmit} autoFocus />
+      </div>
+    </div>
+  );
+};
+
+const WelcomeView = ({ onNewProject }: { onNewProject: () => void }) => (
+  <div className="welcome-screen">
+    <div className="premium-glow"></div>
+    <div className="welcome-logo">💎</div>
+    <div className="welcome-title">NexLab AI Framework 1.0</div>
+    <div className="welcome-subtitle">
+      The state-of-the-art environment for building next-generation agentic workflows.
+    </div>
+    <div className="welcome-actions">
+      <button className="primary-btn" onClick={onNewProject}>
+        <Plus size={18} /> New Agent Project
+      </button>
+      <button className="secondary-btn">
+        <FolderTree size={18} /> Open Directory
+      </button>
+    </div>
+  </div>
+);
+
+const NewProjectModal = ({ onClose, onCreate }: { onClose: () => void, onCreate: (name: string, path: string) => void }) => {
+  const [name, setName] = useState('agent-alpha');
+  const [path, setPath] = useState('');
+  return (
+    <div className="modal-overlay">
+      <div className="configurator-modal project-modal">
+        <div className="modal-header">
+          <h2><Plus size={20} /> Create Agent Project</h2>
+          <X size={20} style={{ cursor: 'pointer' }} onClick={onClose} />
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Project Name</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. MyCodeAssistant" />
+          </div>
+          <div className="form-group">
+            <label>Physical Path</label>
+            <input value={path} onChange={e => setPath(e.target.value)} placeholder="e.g. D:/Projects/NexLab/Alpha" />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="secondary-btn" onClick={onClose}>Cancel</button>
+          <button className="primary-btn" onClick={() => onCreate(name, path)}>Scaffold Project</button>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-// ═══════════ CONTEXT MENU ═══════════
-function ContextMenu({ x, y, node, onClose, onAction }: {
-  x: number; y: number
-  node: FileNode
-  onClose: () => void
-  onAction: (action: string, node: FileNode) => void
-}) {
-  useEffect(() => {
-    const handler = () => onClose()
-    document.addEventListener('click', handler)
-    return () => document.removeEventListener('click', handler)
-  }, [onClose])
-
-  return (
-    <div className="context-menu" style={{ top: y, left: x }}>
-      {node.type === 'directory' && (
-        <>
-          <div className="context-menu-item" onClick={() => onAction('new_file', node)}>📄 New File</div>
-          <div className="context-menu-item" onClick={() => onAction('new_folder', node)}>📁 New Folder</div>
-          <div className="context-menu-divider" />
-        </>
-      )}
-      <div className="context-menu-item" onClick={() => onAction('rename', node)}>✏️ Rename</div>
-      <div className="context-menu-item" onClick={() => onAction('delete', node)}>🗑️ Delete</div>
-    </div>
-  )
-}
-
-// ═══════════ MAIN APP ═══════════
-const DEFAULT_AGENT_CONFIG: AgentConfig = {
-  provider: 'ollama',
-  model: 'llama3',
-  temperature: 0.7,
-  mentorEnabled: true,
-  deepThinkerEnabled: true,
-  mentorInterval: 5,
-  maxResponseLength: 4096,
-  tools: {
-    'File System': true,
-    'Terminal Commands': true,
-    'Web Search': false,
-    'Code Analysis': true,
-    'Image Generation': false,
-  },
-}
+// ═══════════ MAIN APPLICATION ═══════════
 
 export default function App() {
-  // Layout state
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [chatOpen, setChatOpen] = useState(true)
-  const [panelOpen, setPanelOpen] = useState(false)
-  const [panelHeight] = useState(240)
+  const [activeView, setActiveView] = useState<'explorer' | 'chat' | 'dashboard' | 'diagnostics' | 'tools'>('dashboard');
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState('');
+  const [openTabs, setOpenTabs] = useState<string[]>([]);
+  const [terminalOpen, setTerminalOpen] = useState(true);
+  const [panelHeight] = useState(240);
 
-  // File system state
-  const [files, setFiles] = useState<FileNode[]>([])
-  const [openTabs, setOpenTabs] = useState<{ path: string; name: string; content: string; modified: boolean }[]>([])
-  const [activeTab, setActiveTab] = useState<string | null>(null)
+  // Data
+  const [files, setFiles] = useState<FileNode[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    { role: 'assistant', content: 'NexLab 1.0 initialized. Systems verified. How shall we build today?' }
+  ]);
+  const [isThinking, setIsThinking] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<any[]>([]);
+  const [toolsList, setToolsList] = useState<any[]>([]);
+  const [projectStats, setProjectStats] = useState<any>(null);
+  const [agentConfig] = useState<AgentConfig>({
+    provider: 'openai', model: 'gpt-4o', temperature: 0.7, 
+    mentorEnabled: true, deepThinkerEnabled: true, mentorInterval: 5, maxResponseLength: 4096,
+    tools: { 'File System': true, 'Terminal': true }
+  });
 
-  // Chat state
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
-  const [isThinking, setIsThinking] = useState(false)
-  const [nextMsgId, setNextMsgId] = useState(1)
+  // UI
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
 
-  // Agent config
-  const [showConfigurator, setShowConfigurator] = useState(false)
-  const [agentConfig, setAgentConfig] = useState<AgentConfig>(DEFAULT_AGENT_CONFIG)
-
-  // Context menu
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; node: FileNode } | null>(null)
-
-  // Terminal output
-  const [terminalOutput, setTerminalOutput] = useState<string[]>([
-    '> NexLab AI Code Editor v1.0',
-    '> Type commands here...',
-    '',
-  ])
-  const [terminalInput, setTerminalInput] = useState('')
-
-  // Load file tree
-  const loadFiles = useCallback(async () => {
+  const refreshFiles = useCallback(async () => {
     try {
-      const data = await apiGet<{ files: FileNode[] }>('/api/files')
-      setFiles(data.files || [])
-    } catch {
-      // Backend not available yet, use demo data
-      setFiles([
-        {
-          name: 'src', path: '/src', type: 'directory', children: [
-            { name: 'main.py', path: '/src/main.py', type: 'file' },
-            { name: 'utils.py', path: '/src/utils.py', type: 'file' },
-            {
-              name: 'components', path: '/src/components', type: 'directory', children: [
-                { name: 'agent.py', path: '/src/components/agent.py', type: 'file' },
-              ]
-            },
-          ]
-        },
-        { name: 'README.md', path: '/README.md', type: 'file' },
-        { name: 'pyproject.toml', path: '/pyproject.toml', type: 'file' },
-      ])
-    }
-  }, [])
+      const data = await apiGet<{ files: FileNode[] }>('/api/files');
+      setFiles(data.files || []);
+    } catch (e) { console.error("Disk sync failed", e); }
+  }, []);
 
-  useEffect(() => { loadFiles() }, [loadFiles])
-
-  // Open a file
-  const openFile = async (node: FileNode) => {
-    if (openTabs.find(t => t.path === node.path)) {
-      setActiveTab(node.path)
-      return
-    }
-
-    let content = ''
+  const refreshStats = useCallback(async () => {
     try {
-      const data = await apiGet<{ content: string }>(`/api/file?path=${encodeURIComponent(node.path)}`)
-      content = data.content || ''
-    } catch {
-      content = `# ${node.name}\n\n# File content will be loaded from the backend.`
-    }
+      const data = await apiGet<any>('/api/project/stats');
+      setProjectStats(data);
+    } catch (e) { }
+  }, []);
 
-    setOpenTabs(prev => [...prev, { path: node.path, name: node.name, content, modified: false }])
-    setActiveTab(node.path)
-  }
-
-  // Close a tab
-  const closeTab = (path: string) => {
-    setOpenTabs(prev => {
-      const next = prev.filter(t => t.path !== path)
-      if (activeTab === path) {
-        setActiveTab(next.length > 0 ? next[next.length - 1].path : null)
-      }
-      return next
-    })
-  }
-
-  // Editor content change
-  const handleEditorChange = (value: string | undefined) => {
-    if (!activeTab || value === undefined) return
-    setOpenTabs(prev =>
-      prev.map(t => t.path === activeTab ? { ...t, content: value, modified: true } : t)
-    )
-  }
-
-  // Save file
-  const saveFile = async () => {
-    const tab = openTabs.find(t => t.path === activeTab)
-    if (!tab) return
-    try {
-      await apiPost('/api/file/save', { path: tab.path, content: tab.content })
-      setOpenTabs(prev => prev.map(t => t.path === activeTab ? { ...t, modified: false } : t))
-    } catch {
-      // Silently fail if backend not available
-    }
-  }
-
-  // Chat send
-  const handleChatSend = async (msg: string) => {
-    const userMsg: ChatMessage = { id: nextMsgId, role: 'user', content: msg }
-    setChatMessages(prev => [...prev, userMsg])
-    setNextMsgId(prev => prev + 1)
-    setIsThinking(true)
-
-    try {
-      const data = await apiPost<{ reply: string; thinking?: string }>('/api/chat', {
-        message: msg,
-        context: {
-          activeFile: activeTab,
-          openFiles: openTabs.map(t => t.path),
-        }
-      })
-
-      const aiMsg: ChatMessage = {
-        id: nextMsgId + 1,
-        role: 'ai',
-        content: data.reply || 'I understood your request. Let me help you with that.',
-        thinking: data.thinking,
-      }
-      setChatMessages(prev => [...prev, aiMsg])
-      setNextMsgId(prev => prev + 2)
-    } catch {
-      const errorMsg: ChatMessage = {
-        id: nextMsgId + 1,
-        role: 'ai',
-        content: '⚠️ Backend is not connected. Start the server with `python desktop_app/app.py` to enable AI features.',
-      }
-      setChatMessages(prev => [...prev, errorMsg])
-      setNextMsgId(prev => prev + 2)
-    }
-
-    setIsThinking(false)
-  }
-
-  // Context menu actions
-  const handleContextAction = async (action: string, node: FileNode) => {
-    setCtxMenu(null)
-    if (action === 'new_file') {
-      const name = prompt('New file name:')
-      if (name) {
-        try { await apiPost('/api/file/create', { path: `${node.path}/${name}`, type: 'file' }) } catch { }
-        loadFiles()
-      }
-    } else if (action === 'new_folder') {
-      const name = prompt('New folder name:')
-      if (name) {
-        try { await apiPost('/api/file/create', { path: `${node.path}/${name}`, type: 'directory' }) } catch { }
-        loadFiles()
-      }
-    } else if (action === 'delete') {
-      if (confirm(`Delete "${node.name}"?`)) {
-        try { await apiPost('/api/file/delete', { path: node.path }) } catch { }
-        loadFiles()
-      }
-    } else if (action === 'rename') {
-      const name = prompt('New name:', node.name)
-      if (name && name !== node.name) {
-        try { await apiPost('/api/file/rename', { path: node.path, newName: name }) } catch { }
-        loadFiles()
-      }
-    }
-  }
-
-  // Terminal
-  const handleTerminalSubmit = async (e: React.KeyboardEvent) => {
-    if (e.key !== 'Enter') return
-    const cmd = terminalInput.trim()
-    if (!cmd) return
-    setTerminalOutput(prev => [...prev, `$ ${cmd}`])
-    setTerminalInput('')
-    try {
-      const data = await apiPost<{ output: string }>('/api/terminal/exec', { command: cmd })
-      setTerminalOutput(prev => [...prev, data.output || ''])
-    } catch {
-      setTerminalOutput(prev => [...prev, '[Terminal not connected to backend]'])
-    }
-  }
-
-  // Keyboard shortcuts
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 's') { e.preventDefault(); saveFile() }
-      if (e.ctrlKey && e.key === 'b') { e.preventDefault(); setSidebarOpen(p => !p) }
-      if (e.ctrlKey && e.key === 'j') { e.preventDefault(); setPanelOpen(p => !p) }
-      if (e.ctrlKey && e.key === 'l') { e.preventDefault(); setChatOpen(p => !p) }
+    refreshFiles();
+    refreshStats();
+    const timer = setInterval(() => {
+      apiGet<{ events: any[] }>('/api/agent/diagnostics?n=20').then(d => setDiagnostics(d.events || []));
+      apiGet<{ tools: any[] }>('/api/agent/tools').then(d => setToolsList(d.tools || []));
+      refreshStats();
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [refreshFiles, refreshStats]);
+
+  const handleFileSelect = async (path: string) => {
+    try {
+      const data = await apiPost<{ content: string }>('/api/file/read', { path });
+      setActiveFile(path);
+      setFileContent(data.content);
+      if (!openTabs.includes(path)) setOpenTabs([...openTabs, path]);
+    } catch (e) { console.error("IO Error", e); }
+  };
+
+  const handleSaveFile = async () => {
+    if (!activeFile) return;
+    try {
+      await apiPost('/api/file/save', { path: activeFile, content: fileContent });
+    } catch (e) { alert("Write failed: " + e); }
+  };
+
+  const handleChatSend = async (message: string) => {
+    if (!message.trim()) return;
+    setChatMessages(prev => [...prev, { role: 'user', content: message }]);
+    setIsThinking(true);
+    try {
+      const data = await apiPost<any>('/api/chat', { message, context: { activeFile } });
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply, thinking: data.thinking }]);
+    } catch (e) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: "Warning: AI Connection Interrupted." }]);
+    } finally {
+      setIsThinking(false);
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  })
+  };
 
-  const activeTabData = openTabs.find(t => t.path === activeTab)
+  const handleCreateProject = async (name: string, path: string) => {
+    try {
+      const res = await apiPost<any>('/api/project/create', { name, path });
+      if (res.status === 'ok') {
+        setShowNewProjectModal(false);
+        refreshFiles();
+        refreshStats();
+        setActiveView('dashboard');
+      } else { alert("Scaffold error: " + res.error); }
+    } catch (e) { alert("Project creation failed: " + e); }
+  };
 
-  const layoutClasses = [
-    'app-layout',
-    !sidebarOpen && 'sidebar-collapsed',
-    !chatOpen && 'chat-collapsed',
-  ].filter(Boolean).join(' ')
+  const getLang = (path: string) => {
+    const ext = path.split('.').pop();
+    if (ext === 'py') return 'python';
+    if (ext === 'js' || ext === 'jsx' || ext === 'ts' || ext === 'tsx') return 'typescript';
+    if (ext === 'css') return 'css';
+    if (ext === 'html') return 'html';
+    if (ext === 'json') return 'json';
+    if (ext === 'md') return 'markdown';
+    return 'plaintext';
+  };
 
   return (
-    <>
-      <div className={layoutClasses}>
-        {/* HEADER */}
-        <div className="header">
-          <div className="header-logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-            NexLab
-          </div>
+    <div className="app-container">
+      <div className="activity-bar">
+        <div className={`activity-item ${activeView === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveView('dashboard')} title="Dashboard"><Layout size={24} /></div>
+        <div className={`activity-item ${activeView === 'explorer' ? 'active' : ''}`} onClick={() => setActiveView('explorer')} title="Explorer"><FolderTree size={24} /></div>
+        <div className={`activity-item ${activeView === 'chat' ? 'active' : ''}`} onClick={() => setActiveView('chat')} title="AI Chat"><MessageSquare size={24} /></div>
+        <div className={`activity-item ${activeView === 'tools' ? 'active' : ''}`} onClick={() => setActiveView('tools')} title="Capabilities"><Boxes size={24} /></div>
+        <div className={`activity-item ${activeView === 'diagnostics' ? 'active' : ''}`} onClick={() => { setActiveView('diagnostics'); setTerminalOpen(true); }} title="Diagnostics"><Activity size={24} /></div>
+        <div className="activity-spacer" />
+        <div className="activity-item" title="Framework Config"><Settings size={24} /></div>
+      </div>
 
-          <div className="header-actions">
-            <button
-              className={`header-btn ${sidebarOpen ? 'active' : ''}`}
-              onClick={() => setSidebarOpen(p => !p)}
-              title="Toggle Explorer (Ctrl+B)"
-            >📁</button>
-            <button
-              className={`header-btn ${panelOpen ? 'active' : ''}`}
-              onClick={() => setPanelOpen(p => !p)}
-              title="Toggle Terminal (Ctrl+J)"
-            >⬛</button>
-            <button
-              className="header-btn"
-              onClick={() => setShowConfigurator(true)}
-              title="Agent Studio"
-            >🤖</button>
-            <button
-              className={`header-btn ${chatOpen ? 'active' : ''}`}
-              onClick={() => setChatOpen(p => !p)}
-              title="Toggle AI Chat (Ctrl+L)"
-            >✨</button>
+      <div className="main-content">
+        {(activeView === 'explorer' || activeView === 'chat') && (
+          <div className="sidebar" style={{ width: 300 }}>
+            {activeView === 'explorer' && (
+              <Explorer
+                files={files}
+                onSelect={handleFileSelect}
+                onCreateFile={(path: string) => apiPost('/api/file/create', { path, type: 'file' }).then(refreshFiles)}
+                onCreateDir={(path: string) => apiPost('/api/file/create', { path, type: 'directory' }).then(refreshFiles)}
+              />
+            )}
+            {activeView === 'chat' && (
+              <ChatPanel messages={chatMessages} onSend={handleChatSend} isThinking={isThinking} />
+            )}
           </div>
-        </div>
-
-        {/* SIDEBAR */}
-        {sidebarOpen && (
-          <FileTree
-            files={files}
-            activeFile={activeTab}
-            onFileClick={openFile}
-            onRefresh={loadFiles}
-            onContextMenu={(e, f) => setCtxMenu({ x: e.clientX, y: e.clientY, node: f })}
-          />
         )}
 
-        {/* EDITOR AREA */}
-        <div className="editor-area" style={!sidebarOpen ? { gridColumn: sidebarOpen ? '2' : '1 / 3' } : undefined}>
-          {/* Tab bar */}
-          <div className="tab-bar">
-            {openTabs.map(tab => (
-              <div
-                key={tab.path}
-                className={`tab ${activeTab === tab.path ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.path)}
-              >
-                <span className="tab-icon">{getFileIcon(tab.name)}</span>
-                {tab.name}
-                {tab.modified && <span style={{ color: 'var(--status-warning)', marginLeft: 4 }}>●</span>}
-                <button className="tab-close" onClick={(e) => { e.stopPropagation(); closeTab(tab.path) }}>✕</button>
+        <div className="editor-container">
+          <div className="tabs-bar">
+            {openTabs.map(path => (
+              <div key={path} className={`tab ${activeFile === path ? 'active' : ''}`} onClick={() => handleFileSelect(path)}>
+                <FileCode size={14} style={{ marginRight: 6 }} />
+                <span>{path.split('/').pop()}</span>
+                <X size={14} className="close-tab" onClick={(e) => { 
+                  e.stopPropagation(); 
+                  const nextTabs = openTabs.filter(t => t !== path);
+                  setOpenTabs(nextTabs); 
+                  if (activeFile === path) setActiveFile(nextTabs[nextTabs.length - 1] || null); 
+                }} />
               </div>
             ))}
           </div>
 
-          {/* Editor or Welcome */}
-          {activeTabData ? (
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-              <div className="monaco-container" style={{ flex: panelOpen ? `1 1 calc(100% - ${panelHeight}px)` : '1' }}>
+          <div className="view-content">
+            {activeFile ? (
+              <div className="editor-wrapper" style={{ height: '100%', position: 'relative' }}>
                 <Editor
                   theme="vs-dark"
-                  language={getLanguage(activeTabData.name)}
-                  value={activeTabData.content}
-                  onChange={handleEditorChange}
-                  options={{
-                    fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
-                    fontSize: 14,
-                    lineHeight: 22,
-                    minimap: { enabled: true },
-                    smoothScrolling: true,
-                    cursorBlinking: 'smooth',
-                    cursorSmoothCaretAnimation: 'on',
-                    renderWhitespace: 'selection',
-                    bracketPairColorization: { enabled: true },
-                    padding: { top: 12 },
-                    scrollBeyondLastLine: false,
-                  }}
+                  path={activeFile}
+                  defaultLanguage={getLang(activeFile)}
+                  value={fileContent}
+                  onChange={(v) => { if (v !== undefined) setFileContent(v) }}
+                  options={{ fontSize: 13, minimap: { enabled: false }, automaticLayout: true, padding: { top: 12 } }}
                 />
+                <button className="save-button" onClick={handleSaveFile} title="Save File"><Save size={20} /></button>
               </div>
-
-              {/* Bottom Panel (Terminal) */}
-              {panelOpen && (
-                <div className="bottom-panel" style={{ height: panelHeight }}>
-                  <div className="panel-tabs">
-                    <div className="panel-tab active">Terminal</div>
-                    <div className="panel-tab">Problems</div>
-                    <div className="panel-tab">Output</div>
-                  </div>
-                  <div className="terminal-container" style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    padding: '8px 12px',
-                    overflowY: 'auto',
-                    flex: 1,
-                    background: 'var(--bg-primary)',
-                  }}>
-                    {terminalOutput.map((line, i) => (
-                      <div key={i} style={{ color: line.startsWith('$') ? 'var(--accent-secondary)' : 'var(--text-secondary)' }}>
-                        {line}
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ color: 'var(--accent-secondary)' }}>$</span>
-                      <input
-                        value={terminalInput}
-                        onChange={e => setTerminalInput(e.target.value)}
-                        onKeyDown={handleTerminalSubmit}
-                        style={{
-                          flex: 1,
-                          border: 'none',
-                          background: 'transparent',
-                          color: 'var(--text-primary)',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 12,
-                          outline: 'none',
-                        }}
-                        placeholder="Enter command..."
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="welcome-screen">
-              <div className="welcome-logo">⚡</div>
-              <div className="welcome-title">NexLab AI Code Editor</div>
-              <div className="welcome-subtitle">
-                A professional code editor with deep AI integration.
-                Open a file from the explorer or chat with AI to get started.
-              </div>
-              <div className="welcome-shortcuts">
-                <div className="shortcut-row">
-                  <span className="shortcut-key">Ctrl+B</span>
-                  <span>Toggle Explorer</span>
-                </div>
-                <div className="shortcut-row">
-                  <span className="shortcut-key">Ctrl+L</span>
-                  <span>Toggle AI Chat</span>
-                </div>
-                <div className="shortcut-row">
-                  <span className="shortcut-key">Ctrl+J</span>
-                  <span>Toggle Terminal</span>
-                </div>
-                <div className="shortcut-row">
-                  <span className="shortcut-key">Ctrl+S</span>
-                  <span>Save File</span>
-                </div>
-              </div>
-            </div>
-          )}
+            ) : activeView === 'dashboard' ? (
+              <Dashboard stats={projectStats} />
+            ) : activeView === 'diagnostics' ? (
+              <DiagnosticsPanel events={diagnostics} />
+            ) : activeView === 'tools' ? (
+              <CapabilitiesPanel tools={toolsList} />
+            ) : (
+              <WelcomeView onNewProject={() => setShowNewProjectModal(true)} />
+            )}
+          </div>
         </div>
 
-        {/* CHAT PANEL */}
-        {chatOpen && (
-          <ChatPanel
-            messages={chatMessages}
-            onSend={handleChatSend}
-            isThinking={isThinking}
-          />
+        {terminalOpen && (
+          <div className="bottom-panel" style={{ height: panelHeight }}>
+            <div className="panel-header">
+              <span><TerminalIcon size={14} style={{ marginRight: 6 }} /> NEXLAB TERMINAL v1.0</span>
+              <X size={14} style={{ cursor: 'pointer' }} onClick={() => setTerminalOpen(false)} />
+            </div>
+            <div className="panel-content"><TerminalComponent onCommand={(cmd) => apiPost('/api/terminal/exec', { command: cmd })} /></div>
+          </div>
         )}
 
-        {/* STATUS BAR */}
         <div className="statusbar">
           <div className="statusbar-left">
-            <div className="statusbar-item">🌿 main</div>
-            <div className="statusbar-item">{openTabs.length} files open</div>
+            <div className="statusbar-item"><Globe size={14} /> <span>prod-alpha</span></div>
+            <div className="statusbar-item">{openTabs.length} active tabs</div>
+            <div className="statusbar-item"><CheckCircle2 size={14} color="#5bffc2" /> <span>Unified Kernel Active</span></div>
           </div>
           <div className="statusbar-right">
+            <div className="statusbar-item">{activeFile ? getLang(activeFile) : 'Framework 1.0.0'}</div>
             <div className="statusbar-item">
-              {activeTabData ? getLanguage(activeTabData.name) : 'No file'}
-            </div>
-            <div className="statusbar-item">UTF-8</div>
-            <div className="statusbar-item" style={{ cursor: 'pointer' }} onClick={() => setShowConfigurator(true)}>
-              🤖 {agentConfig.provider}/{agentConfig.model}
+              <Cpu size={14} /> {agentConfig.provider}:{agentConfig.model}
             </div>
           </div>
         </div>
       </div>
 
-      {/* MODALS */}
-      {showConfigurator && (
-        <AgentConfigurator
-          config={agentConfig}
-          onChange={setAgentConfig}
-          onClose={() => setShowConfigurator(false)}
-          onSave={() => {
-            setShowConfigurator(false)
-            // Send config to backend
-            apiPost('/api/agent/configure', agentConfig).catch(() => {})
-          }}
-        />
-      )}
-
-      {/* CONTEXT MENU */}
-      {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          node={ctxMenu.node}
-          onClose={() => setCtxMenu(null)}
-          onAction={handleContextAction}
-        />
-      )}
-    </>
-  )
+      {showNewProjectModal && <NewProjectModal onClose={() => setShowNewProjectModal(false)} onCreate={handleCreateProject} />}
+    </div>
+  );
 }

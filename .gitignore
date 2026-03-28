@@ -10,7 +10,6 @@ __pycache__/
 bin/
 build/
 develop-eggs/
-dist/
 eggs/
 lib/
 lib64/
@@ -88,7 +87,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
+.git/
 # its-dangerous stuff:
 .runtime/
 

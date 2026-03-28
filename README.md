@@ -1,6 +1,26 @@
-# smart-agent-arch
+# 💎 NexLab AI Framework v1.0.0
 
-Lightweight facade for initializing and using AI with one stable entrypoint.
+A professional-grade, agentic AI development framework for building autonomous coding assistants and smart systems.
+
+## 🚀 Version 1.0 Highlights
+- **Production GUI**: A full-featured React-based IDE with deep agent integration.
+- **Real-time Diagnostics**: Monitor agent health, events, and performance via the integrated dashboard.
+- **Tool Management**: Dynamic registration and inspection of custom AI capabilities.
+- **Universal Updates**: Git-less framework updates directly from the cloud.
+- **Self-Healing Core**: Resilient background workers with automatic recovery.
+
+## 🛠️ Quick Start
+1.  **Install**: `pip install .`
+2.  **Launch GUI**: `nexlab-gui`
+3.  **Chat**: Talk to your agent in the sidebar to start building.
+
+## 📁 Project Structure
+- `src/smart_agent_arch/`: Core framework logic.
+- `desktop_app/`: Windows desktop application (FastAPI + React).
+- `examples/`: Reference implementations for custom tools.
+
+---
+© 2026 NexLab AI Team. Built for the future of agentic coding.
 
 The intended external usage is fixed around `initialize_ai(config)`.
 

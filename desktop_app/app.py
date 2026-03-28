@@ -120,6 +120,48 @@ def main():
     # Try to use pywebview for a native window
     try:
         import webview
+        
+        # ═══════════ FALLBACK UI ═══════════
+        # If production build is missing AND we are not in DEV mode (no localhost:5173),
+        # we can show a simple instruction page.
+        if not os.path.exists(dist_check):
+            # Try to see if dev server is up
+            dev_up = False
+            try:
+                with urllib.request.urlopen(DEV_FRONTEND_URL, timeout=1) as r:
+                    if r.status == 200: dev_up = True
+            except: pass
+            
+            if not dev_up:
+                fallback_path = os.path.join(PROJECT_ROOT, "desktop_app", "fallback.html")
+                with open(fallback_path, "w", encoding="utf-8") as f:
+                    f.write("""
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>NexLab - Build Required</title>
+                        <style>
+                            body { background: #0d1117; color: #e6edf3; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                            .box { background: #161b22; border: 1px solid #30363d; padding: 40px; border-radius: 12px; max-width: 500px; text-align: center; }
+                            h1 { color: #7c3aed; margin-top: 0; }
+                            code { background: #000; padding: 4px 8px; border-radius: 4px; color: #a78bfa; font-family: monospace; }
+                            .btn { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #7c3aed; color: white; text-decoration: none; border-radius: 6px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="box">
+                            <h1>💎 NexLab AI</h1>
+                            <p>The production UI assets are missing.</p>
+                            <p>Please run the following command in your terminal:</p>
+                            <p><code>nexlab build-gui</code></p>
+                            <p>Then restart the application.</p>
+                            <a href="https://github.com/MikeMartemianov/NexLab" class="btn">View Documentation</a>
+                        </div>
+                    </body>
+                    </html>
+                    """)
+                url = "file://" + fallback_path.replace("\\", "/")
+
         webview.create_window(
             "NexLab AI Code Editor",
             url,

@@ -71,6 +71,17 @@ class TerminalExecRequest(BaseModel):
     command: str
 
 
+class ProjectCreateRequest(BaseModel):
+    path: str
+    name: str
+
+
+class ProjectStatsResponse(BaseModel):
+    fileCount: int
+    dirCount: int
+    totalSize: int
+
+
 class ChatRequest(BaseModel):
     message: str
     context: dict = {}
@@ -211,6 +222,66 @@ def rename_file(req: FileRenameRequest):
         return {"status": "error", "error": str(e)}
 
 
+@app.post("/api/project/create")
+def create_new_project(req: ProjectCreateRequest):
+    """Scaffold a new agent project directory."""
+    try:
+        target_path = Path(req.path).resolve()
+        target_path.mkdir(parents=True, exist_ok=True)
+
+        config_path = target_path / "config.yaml"
+        if not config_path.exists():
+            with open(config_path, "w", encoding="utf-8") as f:
+                f.write(f"""# NexLab Agent Configuration: {req.name}
+provider: openai
+model: gpt-4o
+temperature: 0.7
+mentor_enabled: true
+deep_thinker_enabled: true
+""")
+
+        main_path = target_path / "main.py"
+        if not main_path.exists():
+            with open(main_path, "w", encoding="utf-8") as f:
+                f.write(f"""from smart_agent_arch import initialize_ai
+
+def main():
+    print("Starting NexLab Agent: {req.name}")
+    ai = initialize_ai()
+    response = ai.send_text("Hello, who are you?")
+    print(f"Agent: {{response.content}}")
+
+if __name__ == "__main__":
+    main()
+""")
+
+        return {"status": "ok", "message": f"Project '{req.name}' created at {target_path}"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/api/project/stats")
+def get_project_stats():
+    """Return interesting statistics about the current project."""
+    try:
+        file_count = 0
+        total_size = 0
+        for root, dirs, files in os.walk(WORKSPACE_ROOT):
+            # Skip hidden and large dirs
+            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('node_modules', '__pycache__')]
+            for f in files:
+                file_count += 1
+                total_size += os.path.getsize(os.path.join(root, f))
+        
+        return {
+            "fileCount": file_count,
+            "totalSizeKb": round(total_size / 1024, 1),
+            "projectName": os.path.basename(WORKSPACE_ROOT),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # ═══════════ TERMINAL ═══════════
 @app.post("/api/terminal/exec")
 def terminal_exec(req: TerminalExecRequest):
@@ -300,6 +371,41 @@ def configure_agent(req: AgentConfigRequest):
         return {"status": "ok", "message": "Agent reconfigured successfully"}
     except Exception as e:
         return {"status": "error", "error": str(e)}
+
+
+@app.get("/api/agent/diagnostics")
+def get_diagnostics(n: int = 30):
+    """Return recent diagnostic events."""
+    ai = _get_ai()
+    if not ai:
+        return {"events": []}
+    return {"events": ai.diagnostics(last_n=n)}
+
+
+@app.get("/api/agent/tools")
+def get_tools():
+    """Return currently registered tools."""
+    ai = _get_ai()
+    if not ai:
+        return {"tools": []}
+    # UserAIFacade has _command_parser.describe()
+    context = ai.runtime_context()
+    return {"tools": context.get("command_parser", {}).get("commands", [])}
+
+
+@app.get("/api/agent/status")
+def get_status():
+    """Return high-level agent status."""
+    ai = _get_ai()
+    if not ai:
+        return {"state": "uninitialized"}
+    context = ai.runtime_context()
+    return {
+        "state": context.get("runtime_state"),
+        "mentor_state": context.get("mentor_state"),
+        "deep_thinker_state": context.get("deep_thinker_state"),
+        "version": "1.0.0"
+    }
 
 
 # ═══════════ STATIC FILES (Production) ═══════════

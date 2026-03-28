@@ -2,6 +2,7 @@ import argparse
 import subprocess
 import sys
 import os
+import shutil
 from pathlib import Path
 from rich.console import Console
 from rich.table import Table
@@ -12,6 +13,37 @@ console = Console()
 
 def get_project_root():
     return Path(__file__).resolve().parent.parent.parent
+
+def build_gui_command() -> int:
+    """Automates the building of the React frontend."""
+    project_root = get_project_root()
+    frontend_dir = project_root / "desktop_app" / "frontend"
+
+    if not frontend_dir.exists():
+        console.print(f"[bold red]Error:[/bold red] Frontend directory not found at {frontend_dir}")
+        return 1
+
+    console.print(f"[bold blue]Building NexLab GUI in:[/bold blue] {frontend_dir}")
+
+    # Check for npm
+    npm_path = shutil.which("npm")
+    if not npm_path:
+        console.print("[bold red]Error:[/bold red] 'npm' not found in PATH. Please install Node.js to build the GUI.")
+        return 1
+
+    try:
+        console.print("Running 'npm install'...")
+        subprocess.run([npm_path, "install"], cwd=str(frontend_dir), check=True)
+        console.print("Running 'npm run build'...")
+        subprocess.run([npm_path, "run", "build"], cwd=str(frontend_dir), check=True)
+        console.print("[bold green]Success![/bold green] GUI built successfully.")
+        return 0
+    except subprocess.CalledProcessError as e:
+        console.print(f"[bold red]Error during build:[/bold red] {e}")
+        return 1
+    except Exception as e:
+        console.print(f"[bold red]Unexpected error:[/bold red] {e}")
+        return 1
 
 def update_cmd():
     """Handles the 'update' command."""
@@ -172,13 +204,18 @@ def gui_cmd():
     dist_path = project_root / "desktop_app" / "frontend" / "dist"
     if not dist_path.exists():
         console.print("[yellow]⚠ Warning: GUI Frontend build (dist folder) not found.[/yellow]")
-        console.print("[dim]Run 'npm run build' in desktop_app/frontend to enable production UI.[/dim]\n")
+        console.print("[bold cyan]Pro-tip:[/bold cyan] Run [bold white]nexlab build-gui[/bold white] to automatically build the production UI.\n")
 
     console.print(Panel("🌐 [bold magenta]NexLab GUI:[/bold magenta] Launching Native Desktop App...", expand=False))
     try:
-        subprocess.Popen([sys.executable, str(app_path)], cwd=str(project_root), shell=(sys.platform == "win32"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Use Python executable to launch the app script
+        subprocess.Popen([sys.executable, str(app_path)], 
+                         cwd=str(project_root), 
+                         shell=(sys.platform == "win32"), 
+                         stdout=subprocess.DEVNULL, 
+                         stderr=subprocess.DEVNULL)
         console.print("🚀 [green]GUI command sent. The application window should appear shortly.[/green]")
-        console.print("[dim]Logs available in nexlab_gui.log and nexlab_error.log[/dim]")
+        console.print("[dim]Local web server will start on http://127.0.0.1:8000[/dim]")
     except Exception as e:
         console.print(f"[red]❌ Error launching GUI:[/red] {e}")
 
@@ -186,17 +223,22 @@ def main():
     parser = argparse.ArgumentParser(description="NexLab AI CLI Tool")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
-    subparsers.add_parser("update", help="Update the package from GitHub")
+    update_parser = subparsers.add_parser("update", help="Update the package from GitHub")
+    update_parser.add_argument("--build", action="store_true", help="Automatically rebuild GUI after update")
+    
     subparsers.add_parser("doctor", help="Check system health")
     subparsers.add_parser("status", help="Show framework status")
     subparsers.add_parser("logs", help="View the internal log file")
     subparsers.add_parser("version", help="Show current version")
     subparsers.add_parser("gui", help="Launch the desktop application")
+    subparsers.add_parser("build-gui", help="Automatically build the React frontend")
     
     args = parser.parse_args()
     
     if args.command == "update":
         update_cmd()
+        if args.build:
+            build_gui_command()
     elif args.command == "doctor":
         doctor_cmd()
     elif args.command == "status":
@@ -207,6 +249,8 @@ def main():
         version_cmd()
     elif args.command == "gui":
         gui_cmd()
+    elif args.command == "build-gui":
+        build_gui_command()
     else:
         parser.print_help()
 
