@@ -29,33 +29,58 @@ app.add_middleware(
 
 # ═══════════ GLOBAL STATE  ═══════════
 WORKSPACE_ROOT = str(PROJECT_ROOT)
+SYSTEM_CONFIG_FILE = Path(WORKSPACE_ROOT) / ".nexlab_system_config.yaml"
 _ai_facade = None
 
+def _load_system_config():
+    if SYSTEM_CONFIG_FILE.exists():
+        try:
+            import yaml
+            with open(SYSTEM_CONFIG_FILE, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+        except Exception:
+            pass
+    return {
+        "provider": "openai",
+        "model": "gpt-4o",
+        "api_key": "",
+        "base_url": "",
+        "temperature": 0.7,
+        "mentorEnabled": True,
+        "deepThinkerEnabled": True,
+    }
+
+def _save_system_config(cfg):
+    try:
+        import yaml
+        with open(SYSTEM_CONFIG_FILE, "w", encoding="utf-8") as f:
+            yaml.dump(cfg, f)
+    except Exception:
+        pass
+
+_current_agent_config = _load_system_config()
 
 def _get_ai():
     global _ai_facade
     if _ai_facade is None:
         try:
             from smart_agent_arch.user_api import UserAIFacade
-            _ai_facade = UserAIFacade(config={
-                "provider": _current_agent_config.get("provider", "ollama"),
-                "model": _current_agent_config.get("model", "llama3"),
+            config_dict = {
+                "provider": _current_agent_config.get("provider", "openai"),
+                "model": _current_agent_config.get("model", "gpt-4o"),
+                "api_key": _current_agent_config.get("api_key", ""),
+                "base_url": _current_agent_config.get("base_url", ""),
                 "temperature": _current_agent_config.get("temperature", 0.7),
-            })
-        except Exception:
+            }
+            # Remove empty strings to not break validators
+            if not config_dict["api_key"]: config_dict.pop("api_key", None)
+            if not config_dict["base_url"]: config_dict.pop("base_url", None)
+            
+            _ai_facade = UserAIFacade(config=config_dict)
+        except Exception as e:
+            print(f"Failed to auto-init facade: {e}")
             _ai_facade = None
     return _ai_facade
-
-_current_agent_config = {
-    "provider": "openai",
-    "model": "gpt-4o",
-    "api_key": "",
-    "base_url": "",
-    "temperature": 0.7,
-    "mentorEnabled": True,
-    "deepThinkerEnabled": True,
-}
-
 
 # ═══════════ MODELS ═══════════
 class FileCreateRequest(BaseModel):
@@ -421,6 +446,12 @@ def configure_agent(req: AgentConfigRequest):
             "mentor_interval_sec": req.mentorInterval,
             "max_response_length": req.maxResponseLength,
         }
+        
+        # Remove empty fields so we don't accidentally override FullConfig
+        if not config_dict.get("api_key"): config_dict.pop("api_key", None)
+        if not config_dict.get("base_url"): config_dict.pop("base_url", None)
+
+        _save_system_config(_current_agent_config)
 
         # Stop existing facade
         if _ai_facade:
