@@ -1,39 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
 import { 
   FileCode, MessageSquare, Activity, Settings, 
-  Terminal as TerminalIcon, FolderTree, Plus, 
+  Terminal as TerminalIcon, FolderTree, 
   Cpu, Zap, Shield, ChevronRight, ChevronDown, 
-  X, Save, Boxes, Info, CheckCircle2, Globe, Layout, Send
+  X, Save, Boxes, CheckCircle2, Layout, Send
 } from 'lucide-react';
-
-// ═══════════ TYPES ═══════════
-
-interface FileNode {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  children?: FileNode[];
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  thinking?: string;
-}
-
-interface AgentConfig {
-  provider: string;
-  model: string;
-  temperature: number;
-  mentorEnabled: boolean;
-  deepThinkerEnabled: boolean;
-  mentorInterval: number;
-  maxResponseLength: number;
-  tools: Record<string, boolean>;
-}
-
-// ═══════════ API HELPERS ═══════════
 
 const API_BASE = 'http://127.0.0.1:8000';
 
@@ -53,476 +25,330 @@ async function apiPost<T>(path: string, body: any): Promise<T> {
   return res.json();
 }
 
-// ═══════════ SUB-COMPONENTS ═══════════
+// --- Types ---
+interface FileNode { name: string; path: string; type: 'file' | 'directory'; children?: FileNode[]; }
+interface ChatMessage { role: 'user' | 'assistant'; content: string; thinking?: string; }
 
-const Dashboard = ({ stats }: { stats: any }) => (
-  <div className="dashboard-container">
-    <div className="dashboard-header">
-      <Layout size={32} color="var(--text-accent)" />
-      <h1>Project Dashboard</h1>
-    </div>
-    <div className="stats-grid">
-      <div className="stat-card">
-        <div className="stat-icon"><FileCode size={24} /></div>
-        <div className="stat-info">
-          <div className="stat-label">Files</div>
-          <div className="stat-value">{stats?.fileCount || 0}</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon"><Activity size={24} /></div>
-        <div className="stat-info">
-          <div className="stat-label">Project Size</div>
-          <div className="stat-value">{stats?.totalSizeKb || 0} KB</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon"><Zap size={24} /></div>
-        <div className="stat-info">
-          <div className="stat-label">Agent Health</div>
-          <div className="stat-value" style={{ color: 'var(--status-success)' }}>Excellent</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon"><Shield size={24} /></div>
-        <div className="stat-info">
-          <div className="stat-label">Uptime</div>
-          <div className="stat-value">99.9%</div>
-        </div>
-      </div>
-    </div>
-    
-    <div className="dashboard-content">
-      <div className="content-panel project-info">
-        <h3><Info size={18} /> Project Information</h3>
-        <p><strong>Name:</strong> {stats?.projectName || 'Unnamed Project'}</p>
-        <p><strong>Status:</strong> <span style={{ color: 'var(--status-success)', textShadow: '0 0 10px var(--status-success)' }}>Active & Connected</span></p>
-        <div className="progress-bar"><div className="progress-fill" style={{ width: '68%' }}></div></div>
-        <small>Framework Maturity: Release 1.5.0 Stable</small>
-      </div>
-      <div className="content-panel agent-activity">
-        <h3><Activity size={18} /> Recent Activity</h3>
-        <div className="activity-list" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-          <div style={{ marginBottom: '8px' }}>• Advanced UI Overhaul complete (v1.5.0)</div>
-          <div style={{ marginBottom: '8px' }}>• AI initialized successfully (v1.5.0)</div>
-          <div style={{ marginBottom: '8px' }}>• Configuration sync: System Optimal</div>
-          <div style={{ marginBottom: '8px' }}>• Memory pool optimized for long-context</div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const DiagnosticsPanel = ({ events }: { events: any[] }) => (
-  <div className="panel-inner-view" style={{ padding: '24px' }}>
-    <div className="view-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-      <Activity size={24} color="var(--text-accent)" />
-      <h2 style={{ margin: 0 }}>System Diagnostics</h2>
-    </div>
-    <div className="diagnostics-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {events.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No recent events. Waiting for activity...</div>}
-      {events.map((ev, i) => (
-        <div key={i} style={{ 
-          padding: '8px 12px', 
-          background: 'var(--bg-secondary)', 
-          borderLeft: `3px solid ${ev.level === 'error' ? 'var(--status-error)' : 'var(--text-accent)'}`,
-          borderRadius: '4px',
-          fontSize: '12.5px'
-        }}>
-          <span style={{ color: 'var(--text-muted)', marginRight: '10px', fontFamily: 'var(--font-mono)' }}>[{ev.timestamp?.split('T')[1]?.split('.')[0]}]</span>
-          <span style={{ color: 'var(--text-primary)' }}>{ev.message || ev.summary}</span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const CapabilitiesPanel = ({ tools }: { tools: any[] }) => (
-  <div className="panel-inner-view" style={{ padding: '24px' }}>
-    <div className="view-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-      <Boxes size={24} color="var(--text-accent)" />
-      <h2 style={{ margin: 0 }}>Agent Capabilities</h2>
-    </div>
-    <div className="tools-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-      {tools.length === 0 && <div style={{ color: 'var(--text-muted)' }}>Detecting system capabilities...</div>}
-      {tools.map((t, i) => (
-        <div key={i} className="tool-card" style={{ 
-          background: 'var(--bg-secondary)', 
-          border: '1px solid var(--border-primary)', 
-          borderRadius: '10px', 
-          padding: '16px' 
-        }}>
-          <div style={{ fontWeight: 'bold', color: 'var(--text-accent)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <TerminalIcon size={14} /> {t.name}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{t.description}</div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const ChatPanel = ({ messages, onSend, isThinking }: { messages: ChatMessage[], onSend: (m: string) => void, isThinking: boolean }) => {
-  const [input, setInput] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, isThinking]);
-
-  return (
-    <div className="chat-panel">
-      <div className="chat-header">
-        <span><MessageSquare size={16} /> AI Assistant</span>
-        <div className={`status-dot ${isThinking ? 'pulsing' : 'active'}`} />
-      </div>
-      <div className="chat-messages">
-        {messages.map((m, i) => (
-          <div key={i} className={`message ${m.role}`}>
-            <div className="message-content">{m.content}</div>
-            {m.thinking && <div className="thinking-bubble">{m.thinking}</div>}
-          </div>
-        ))}
-        {isThinking && <div className="message assistant thinking">Thinking...</div>}
-        <div ref={endRef} />
-      </div>
-      <div className="chat-input-area">
-        <div className="chat-input-row">
-          <input 
-            value={input} 
-            onChange={e => setInput(e.target.value)} 
-            onKeyDown={e => { if (e.key === 'Enter') { onSend(input); setInput(''); } }} 
-            placeholder="Type your instruction..." 
-          />
-          <button className="primary-btn" style={{ padding: '6px' }} onClick={() => { onSend(input); setInput(''); }}>
-            <Send size={16} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const FileTreeNode = ({ node, onSelect }: { 
-  node: FileNode; 
-  onSelect: (path: string) => void;
-}) => {
+// --- Components ---
+const FileTreeNode = ({ node, onSelect }: { node: FileNode; onSelect: (path: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const isDir = node.type === 'directory';
 
   return (
-    <div className="tree-node">
-      <div 
-        className={`node-label ${isDir ? 'dir' : 'file'}`}
-        onClick={() => isDir ? setIsOpen(!isOpen) : onSelect(node.path)}
-      >
-        <span className="node-icon">
-          {isDir ? (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : <FileCode size={14} />}
-        </span>
-        <span className="node-text">{node.name}</span>
+    <div style={{ paddingLeft: '8px' }}>
+      <div className="tree-item" onClick={() => isDir ? setIsOpen(!isOpen) : onSelect(node.path)}>
+        {isDir ? (isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : <FileCode size={14} />}
+        {node.name}
       </div>
       {isDir && isOpen && node.children && (
-        <div className="node-children">
-          {node.children.map(child => (
-            <FileTreeNode key={child.path} node={child} onSelect={onSelect} />
-          ))}
+        <div style={{ marginLeft: '4px', borderLeft: '1px solid var(--border-muted)' }}>
+          {node.children.map(child => <FileTreeNode key={child.path} node={child} onSelect={onSelect} />)}
         </div>
       )}
     </div>
   );
 };
 
-const Explorer = ({ files, onSelect, onCreateFile, onCreateDir }: any) => (
-  <div className="explorer-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-    <div className="sidebar-header" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-primary)' }}>
-      <span>EXPLORER</span>
-      <div className="header-actions" style={{ display: 'flex', gap: '8px' }}>
-        <button className="icon-btn" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => onCreateFile('new_agent.py')} title="New File"><Plus size={14} /></button>
-        <button className="icon-btn" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => onCreateDir('new_module')} title="New Folder"><FolderTree size={14} /></button>
-      </div>
-    </div>
-    <div className="sidebar-content" style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
-      {files.map((node: any) => (
-        <FileTreeNode key={node.path} node={node} onSelect={onSelect} />
-      ))}
-    </div>
-  </div>
-);
-
-const TerminalComponent = ({ onCommand }: { onCommand: (cmd: string) => void }) => {
-  const [input, setInput] = useState('');
-  const [history, setHistory] = useState<string[]>(['Welcome to NexLab 1.5.0 Professional Terminal.', 'Type "help" to see capabilities.']);
-  
-  const handleSubmit = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && input.trim()) {
-      onCommand(input);
-      setHistory(prev => [...prev, `❯ ${input}`]);
-      setInput('');
-    }
-  };
+const SettingsModal = ({ config, onClose, onSave }: any) => {
+  const [model, setModel] = useState(config.model || 'gpt-4o');
+  const [provider, setProvider] = useState(config.provider || 'openai');
+  const [temp, setTemp] = useState(config.temperature || 0.7);
 
   return (
-    <div className="terminal-body">
-      <div className="terminal-history">
-        {history.map((line, i) => <div key={i} className="terminal-line">{line}</div>)}
-      </div>
-      <div className="terminal-input-row">
-        <span className="prompt">❯</span>
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleSubmit} autoFocus />
-      </div>
-    </div>
-  );
-};
-
-const WelcomeView = ({ onNewProject }: { onNewProject: () => void }) => (
-  <div className="welcome-screen">
-    <div className="premium-glow"></div>
-    <div className="welcome-logo">💎</div>
-    <div className="welcome-title">NexLab AI Framework 1.5.0</div>
-    <div className="welcome-subtitle">
-      The state-of-the-art environment for building next-generation agentic workflows.
-      <br/>Now with enhanced Glassmorphic UI and optimized web deployment.
-    </div>
-    <div className="welcome-actions">
-      <button className="primary-btn" onClick={onNewProject}>
-        <Plus size={18} /> New Agent Project
-      </button>
-      <button className="secondary-btn">
-        <FolderTree size={18} /> Open Directory
-      </button>
-    </div>
-  </div>
-);
-
-const NewProjectModal = ({ onClose, onCreate }: { onClose: () => void, onCreate: (name: string, path: string) => void }) => {
-  const [name, setName] = useState('agent-alpha');
-  const [path, setPath] = useState('');
-  return (
-    <div className="modal-overlay">
-      <div className="configurator-modal project-modal">
+    <div className="modal-bg">
+      <div className="modal-content">
         <div className="modal-header">
-          <h2><Plus size={20} /> Create Agent Project</h2>
-          <X size={20} style={{ cursor: 'pointer' }} onClick={onClose} />
+          <span>Agent Configuration</span>
+          <X size={18} style={{ cursor: 'pointer' }} onClick={onClose} />
         </div>
         <div className="modal-body">
           <div className="form-group">
-            <label>Project Name</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. MyCodeAssistant" />
+            <label>AI Provider</label>
+            <select value={provider} onChange={e => setProvider(e.target.value)}>
+              <option value="openai">OpenAI</option>
+              <option value="ollama">Ollama (Local)</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
           </div>
           <div className="form-group">
-            <label>Physical Path</label>
-            <input value={path} onChange={e => setPath(e.target.value)} placeholder="e.g. D:/Projects/NexLab/Alpha" />
+            <label>Model</label>
+            <input value={model} onChange={e => setModel(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>Temperature ({temp})</label>
+            <input type="range" min="0" max="1" step="0.1" value={temp} onChange={e => setTemp(parseFloat(e.target.value))} />
           </div>
         </div>
         <div className="modal-footer">
-          <button className="secondary-btn" onClick={onClose}>Cancel</button>
-          <button className="primary-btn" onClick={() => onCreate(name, path)}>Scaffold Project</button>
+          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={() => onSave({ provider, model, temperature: temp, mentorEnabled: true, deepThinkerEnabled: true })}>Save & Restart</button>
         </div>
       </div>
     </div>
   );
 };
 
-// ═══════════ MAIN APPLICATION ═══════════
-
 export default function App() {
-  const [activeView, setActiveView] = useState<'explorer' | 'chat' | 'dashboard' | 'diagnostics' | 'tools'>('dashboard');
+  const [view, setView] = useState<'home' | 'explorer' | 'chat'>('home');
+  const [files, setFiles] = useState<FileNode[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState('');
   const [openTabs, setOpenTabs] = useState<string[]>([]);
-  const [terminalOpen, setTerminalOpen] = useState(true);
-  const [panelHeight] = useState(240);
-
-  // Data
-  const [files, setFiles] = useState<FileNode[]>([]);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { role: 'assistant', content: 'NexLab 1.5.0 initialized. UI Overhauled. Systems verified. How shall we build today?' }
-  ]);
-  const [isThinking, setIsThinking] = useState(false);
-  const [diagnostics, setDiagnostics] = useState<any[]>([]);
-  const [toolsList, setToolsList] = useState<any[]>([]);
+  
+  // Real Data State
   const [projectStats, setProjectStats] = useState<any>(null);
-  const [agentConfig] = useState<AgentConfig>({
-    provider: 'openai', model: 'gpt-4o', temperature: 0.7, 
-    mentorEnabled: true, deepThinkerEnabled: true, mentorInterval: 5, maxResponseLength: 4096,
-    tools: { 'File System': true, 'Terminal': true }
-  });
+  const [agentStatus, setAgentStatus] = useState<any>(null);
+  const [showConfig, setShowConfig] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  
+  const [chatMsgs, setChatMsgs] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [terminalLog, setTerminalLog] = useState<string[]>(['NexLab Kernel v1.0 Ready.']);
+  const [termInput, setTermInput] = useState('');
 
-  // UI
-  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
-
-  const refreshFiles = useCallback(async () => {
+  const fetchState = useCallback(async () => {
     try {
-      const data = await apiGet<{ files: FileNode[] }>('/api/files');
-      setFiles(data.files || []);
-    } catch (e) { console.error("Disk sync failed", e); }
-  }, []);
-
-  const refreshStats = useCallback(async () => {
-    try {
-      const data = await apiGet<any>('/api/project/stats');
-      setProjectStats(data);
-    } catch (e) { }
+      const f = await apiGet<any>('/api/files');
+      if (f.files) setFiles(f.files);
+      const s = await apiGet<any>('/api/project/stats');
+      setProjectStats(s);
+      const ag = await apiGet<any>('/api/agent/status');
+      setAgentStatus(ag);
+    } catch (e) {
+      console.warn("Backend fetch failed", e);
+    }
   }, []);
 
   useEffect(() => {
-    refreshFiles();
-    refreshStats();
-    const timer = setInterval(() => {
-      apiGet<{ events: any[] }>('/api/agent/diagnostics?n=20').then(d => setDiagnostics(d.events || []));
-      apiGet<{ tools: any[] }>('/api/agent/tools').then(d => setToolsList(d.tools || []));
-      refreshStats();
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [refreshFiles, refreshStats]);
+    fetchState();
+    const t = setInterval(fetchState, 5000);
+    return () => clearInterval(t);
+  }, [fetchState]);
 
-  const handleFileSelect = async (path: string) => {
+  const handleSelectFile = async (path: string) => {
     try {
-      const data = await apiPost<{ content: string }>('/api/file/read', { path });
+      const res = await apiGet<any>(`/api/file?path=${encodeURIComponent(path)}`);
+      setFileContent(res.content || '');
       setActiveFile(path);
-      setFileContent(data.content);
       if (!openTabs.includes(path)) setOpenTabs([...openTabs, path]);
-    } catch (e) { console.error("IO Error", e); }
+    } catch (e) { console.error("Could not load file"); }
   };
 
-  const handleSaveFile = async () => {
+  const closeTab = (e: any, path: string) => {
+    e.stopPropagation();
+    const newTabs = openTabs.filter(t => t !== path);
+    setOpenTabs(newTabs);
+    if (activeFile === path) setActiveFile(newTabs.length ? newTabs[newTabs.length - 1] : null);
+  };
+
+  const handleSave = async () => {
     if (!activeFile) return;
     try {
-      await apiPost('/api/file/save', { path: activeFile, content: fileContent });
-    } catch (e) { alert("Write failed: " + e); }
+       await apiPost('/api/file/save', { path: activeFile, content: fileContent });
+    } catch (e) { alert("Save failed"); }
   };
 
-  const handleChatSend = async (message: string) => {
-    if (!message.trim()) return;
-    setChatMessages(prev => [...prev, { role: 'user', content: message }]);
-    setIsThinking(true);
+  const handleChat = async () => {
+    if (!chatInput.trim()) return;
+    const msg = chatInput;
+    setChatMsgs(p => [...p, { role: 'user', content: msg }]);
+    setChatInput('');
     try {
-      const data = await apiPost<any>('/api/chat', { message, context: { activeFile } });
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply, thinking: data.thinking }]);
+      const res = await apiPost<any>('/api/chat', { message: msg });
+      setChatMsgs(p => [...p, { role: 'assistant', content: res.reply, thinking: res.thinking }]);
     } catch (e) {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: "Warning: AI Connection Interrupted." }]);
-    } finally {
-      setIsThinking(false);
+      setChatMsgs(p => [...p, { role: 'assistant', content: "[Backend AI Error]" }]);
     }
   };
 
-  const handleCreateProject = async (name: string, path: string) => {
+  const handleTermCommand = async (e: any) => {
+    if (e.key === 'Enter' && termInput.trim()) {
+      const cmd = termInput;
+      setTerminalLog(p => [...p, `❯ ${cmd}`]);
+      setTermInput('');
+      try {
+        const res = await apiPost<any>('/api/terminal/exec', { command: cmd });
+        setTerminalLog(p => [...p, res.output]);
+      } catch (e) {
+        setTerminalLog(p => [...p, `Error executing command.`]);
+      }
+    }
+  };
+
+  const saveConfig = async (cfg: any) => {
     try {
-      const res = await apiPost<any>('/api/project/create', { name, path });
-      if (res.status === 'ok') {
-        setShowNewProjectModal(false);
-        refreshFiles();
-        refreshStats();
-        setActiveView('dashboard');
-      } else { alert("Scaffold error: " + res.error); }
-    } catch (e) { alert("Project creation failed: " + e); }
+      await apiPost('/api/agent/configure', cfg);
+      setShowConfig(false);
+      fetchState();
+    } catch (e) { alert("Failed to configure AI"); }
   };
 
   const getLang = (path: string) => {
-    const ext = path.split('.').pop();
-    if (ext === 'py') return 'python';
-    if (ext === 'js' || ext === 'jsx' || ext === 'ts' || ext === 'tsx') return 'typescript';
-    if (ext === 'css') return 'css';
-    if (ext === 'html') return 'html';
-    if (ext === 'json') return 'json';
-    if (ext === 'md') return 'markdown';
-    return 'plaintext';
+      const ext = path.split('.').pop() || '';
+      return { tsx: 'typescript', ts: 'typescript', js: 'javascript', py: 'python', css: 'css', html: 'html', json: 'json' }[ext] || 'plaintext';
   };
 
   return (
-    <div className="app-container">
+    <div className="app-layout">
+      {/* Activity Bar */}
       <div className="activity-bar">
-        <div className={`activity-item ${activeView === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveView('dashboard')} title="Dashboard"><Layout size={24} /></div>
-        <div className={`activity-item ${activeView === 'explorer' ? 'active' : ''}`} onClick={() => setActiveView('explorer')} title="Explorer"><FolderTree size={24} /></div>
-        <div className={`activity-item ${activeView === 'chat' ? 'active' : ''}`} onClick={() => setActiveView('chat')} title="AI Chat"><MessageSquare size={24} /></div>
-        <div className={`activity-item ${activeView === 'tools' ? 'active' : ''}`} onClick={() => setActiveView('tools')} title="Capabilities"><Boxes size={24} /></div>
-        <div className={`activity-item ${activeView === 'diagnostics' ? 'active' : ''}`} onClick={() => { setActiveView('diagnostics'); setTerminalOpen(true); }} title="Diagnostics"><Activity size={24} /></div>
-        <div className="activity-spacer" />
-        <div className="activity-item" title="Framework Config"><Settings size={24} /></div>
+        <div className={`action-btn ${view === 'home' ? 'active' : ''}`} onClick={() => setView('home')} title="Dashboard">
+          <Layout size={22} />
+        </div>
+        <div className={`action-btn ${view === 'explorer' ? 'active' : ''}`} onClick={() => setView('explorer')} title="Explorer">
+          <FolderTree size={22} />
+        </div>
+        <div className={`action-btn ${view === 'chat' ? 'active' : ''}`} onClick={() => setView('chat')} title="AI Chat">
+          <MessageSquare size={22} />
+        </div>
+        
+        <div className="spacer" />
+        
+        <div className={`action-btn ${terminalOpen ? 'active' : ''}`} onClick={() => setTerminalOpen(!terminalOpen)} title="Terminal">
+          <TerminalIcon size={22} />
+        </div>
+        <div className="action-btn" onClick={() => setShowConfig(true)} title="Settings">
+          <Settings size={22} />
+        </div>
       </div>
 
-      <div className="main-content">
-        {(activeView === 'explorer' || activeView === 'chat') && (
-          <div className="sidebar" style={{ width: 300 }}>
-            {activeView === 'explorer' && (
-              <Explorer
-                files={files}
-                onSelect={handleFileSelect}
-                onCreateFile={(path: string) => apiPost('/api/file/create', { path, type: 'file' }).then(refreshFiles)}
-                onCreateDir={(path: string) => apiPost('/api/file/create', { path, type: 'directory' }).then(refreshFiles)}
-              />
-            )}
-            {activeView === 'chat' && (
-              <ChatPanel messages={chatMessages} onSend={handleChatSend} isThinking={isThinking} />
-            )}
-          </div>
-        )}
-
-        <div className="editor-container">
-          <div className="tabs-bar">
-            {openTabs.map(path => (
-              <div key={path} className={`tab ${activeFile === path ? 'active' : ''}`} onClick={() => handleFileSelect(path)}>
-                <FileCode size={14} style={{ marginRight: 6 }} />
-                <span>{path.split('/').pop()}</span>
-                <X size={14} className="close-tab" onClick={(e) => { 
-                  e.stopPropagation(); 
-                  const nextTabs = openTabs.filter(t => t !== path);
-                  setOpenTabs(nextTabs); 
-                  if (activeFile === path) setActiveFile(nextTabs[nextTabs.length - 1] || null); 
-                }} />
+      <div className="main-area">
+        <div className="workspace-container">
+          
+          {/* Side Panel */}
+          {(view === 'explorer' || view === 'chat') && (
+            <div className="sidebar-panel">
+              <div className="sidebar-header">
+                {view === 'explorer' ? 'Explorer' : 'Agent Chat'}
               </div>
-            ))}
-          </div>
+              
+              <div className="sidebar-content">
+                {view === 'explorer' && files.map(n => <FileTreeNode key={n.path} node={n} onSelect={handleSelectFile} />)}
+                
+                {view === 'chat' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '0 12px' }}>
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
+                      {chatMsgs.map((m, i) => (
+                        <div key={i} style={{ 
+                          background: m.role === 'user' ? 'var(--bg-elevated)' : 'var(--accent-glow)', 
+                          padding: '10px 14px', borderRadius: '12px', alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                          border: m.role === 'assistant' ? '1px solid var(--accent-base)' : '1px solid var(--border-muted)',
+                          maxWidth: '90%'
+                        }}>
+                          {m.content}
+                          {m.thinking && <div style={{ marginTop: 8, fontSize: 11, fontStyle: 'italic', opacity: 0.7 }}>Thought: {m.thinking}</div>}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ padding: '12px 0', borderTop: '1px solid var(--border-muted)', display: 'flex', gap: '8px' }}>
+                      <input style={{ flex: 1, background: 'var(--bg-elevated)', border: 'none', color: '#fff', padding: '8px 12px', borderRadius: '8px', outline: 'none' }}
+                        value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleChat()} placeholder="Instruct Agent..." />
+                      <button className="btn btn-primary" style={{ padding: '8px 12px' }} onClick={handleChat}><Send size={16}/></button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-          <div className="view-content">
+          {/* Central Area */}
+          <div className="content-view">
             {activeFile ? (
-              <div className="editor-wrapper" style={{ height: '100%', position: 'relative' }}>
-                <Editor
-                  theme="vs-dark"
-                  path={activeFile}
-                  defaultLanguage={getLang(activeFile)}
-                  value={fileContent}
-                  onChange={(v) => { if (v !== undefined) setFileContent(v) }}
-                  options={{ fontSize: 13, minimap: { enabled: false }, automaticLayout: true, padding: { top: 12 } }}
-                />
-                <button className="save-button" onClick={handleSaveFile} title="Save File"><Save size={20} /></button>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div className="tabs-header">
+                  {openTabs.map(t => (
+                    <div key={t} className={`tab ${activeFile === t ? 'active' : ''}`} onClick={() => setActiveFile(t)}>
+                      <FileCode size={14} /> {t.split('/').pop()}
+                      <X size={14} className="close-btn" onClick={(e) => closeTab(e, t)} />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <Editor
+                    theme="vs-dark"
+                    language={getLang(activeFile)}
+                    path={activeFile}
+                    value={fileContent}
+                    onChange={v => setFileContent(v || '')}
+                    options={{ minimap: { enabled: false }, fontSize: 13, padding: { top: 16 } }}
+                  />
+                  <button className="floating-save" onClick={handleSave}><Save size={20}/></button>
+                </div>
               </div>
-            ) : activeView === 'dashboard' ? (
-              <Dashboard stats={projectStats} />
-            ) : activeView === 'diagnostics' ? (
-              <DiagnosticsPanel events={diagnostics} />
-            ) : activeView === 'tools' ? (
-              <CapabilitiesPanel tools={toolsList} />
             ) : (
-              <WelcomeView onNewProject={() => setShowNewProjectModal(true)} />
+              <div className="home-view">
+                <div className="home-header">
+                  <h1>NexLab AI 1.0</h1>
+                  <p style={{ color: 'var(--text-muted)' }}>Workspace Orchestration Center</p>
+                </div>
+
+                <div className="glass-card">
+                  <h3 style={{ marginTop: 0, marginBottom: 20, color: 'var(--text-muted)', fontSize: 14 }}>Realtime Telemetry</h3>
+                  <div className="stats-row">
+                    <div className="stat-item">
+                      <div className="stat-icon"><FolderTree size={24} /></div>
+                      <div className="stat-details"><h4>Project Root</h4><p style={{fontSize: 18}}>{projectStats?.projectName || 'Loading...'}</p></div>
+                    </div>
+                    <div className="stat-item">
+                      <div className="stat-icon"><FileCode size={24} /></div>
+                      <div className="stat-details"><h4>Tracked Files</h4><p>{projectStats?.fileCount ?? 0}</p></div>
+                    </div>
+                    <div className="stat-item">
+                      <div className="stat-icon"><Activity size={24} /></div>
+                      <div className="stat-details"><h4>Project Volume</h4><p>{projectStats?.totalSizeKb ?? 0} KB</p></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card">
+                  <h3 style={{ marginTop: 0, marginBottom: 20, color: 'var(--text-muted)', fontSize: 14 }}>AI Kernel Status</h3>
+                  <div className="stats-row">
+                    <div className="stat-item">
+                      <div className="stat-icon" style={{ background: agentStatus?.state === 'ready' ? 'rgba(16,185,129,0.2)' : 'var(--bg-elevated)', color: agentStatus?.state === 'ready' ? 'var(--success)' : 'var(--text-dim)' }}><Cpu size={24} /></div>
+                      <div className="stat-details"><h4>Core Engine</h4><p style={{fontSize: 16, textTransform: 'capitalize'}}>{agentStatus?.state || 'Offline'}</p></div>
+                    </div>
+                    <div className="stat-item">
+                      <div className="stat-icon" style={{ background: 'rgba(99,102,241,0.2)', color: 'var(--accent-base)' }}><Shield size={24} /></div>
+                      <div className="stat-details"><h4>Mentor Module</h4><p style={{fontSize: 16, textTransform: 'capitalize'}}>{agentStatus?.mentor_state || 'Standby'}</p></div>
+                    </div>
+                    <div className="stat-item">
+                      <div className="stat-icon" style={{ background: 'rgba(245,158,11,0.2)', color: 'var(--warning)' }}><Zap size={24} /></div>
+                      <div className="stat-details"><h4>Deep Thinker</h4><p style={{fontSize: 16, textTransform: 'capitalize'}}>{agentStatus?.deep_thinker_state || 'Sleeping'}</p></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>
 
+        {/* Terminal Dock */}
         {terminalOpen && (
-          <div className="bottom-panel" style={{ height: panelHeight }}>
-            <div className="panel-header">
-              <span><TerminalIcon size={14} style={{ marginRight: 6 }} /> NEXLAB TERMINAL v1.5.0</span>
+          <div className="bottom-dock">
+            <div className="dock-header">
+              <span>NEXLAB TERMINAL</span>
               <X size={14} style={{ cursor: 'pointer' }} onClick={() => setTerminalOpen(false)} />
             </div>
-            <div className="panel-content"><TerminalComponent onCommand={(cmd) => apiPost('/api/terminal/exec', { command: cmd })} /></div>
+            <div className="terminal-container">
+              {terminalLog.map((l, i) => <div key={i} className="terminal-line">{l}</div>)}
+              <div className="terminal-input-wrap">
+                <span>❯</span>
+                <input autoFocus value={termInput} onChange={e => setTermInput(e.target.value)} onKeyDown={handleTermCommand} />
+              </div>
+            </div>
           </div>
         )}
 
-        <div className="statusbar">
-          <div className="statusbar-left">
-            <div className="statusbar-item"><Globe size={14} /> <span>prod-alpha</span></div>
-            <div className="statusbar-item">{openTabs.length} active tabs</div>
-            <div className="statusbar-item"><CheckCircle2 size={14} color="#5bffc2" /> <span>Unified Kernel Active</span></div>
+        <div className="status-bar">
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <div className="status-item"><CheckCircle2 size={13} color="var(--success)" /> Connected: {API_BASE}</div>
+            <div className="status-item"><Boxes size={13} /> FW: v{agentStatus?.version || '1.0'}</div>
           </div>
-          <div className="statusbar-right">
-            <div className="statusbar-item">{activeFile ? getLang(activeFile) : 'Framework 1.5.0'}</div>
-            <div className="statusbar-item">
-              <Cpu size={14} /> {agentConfig.provider}:{agentConfig.model}
-            </div>
-          </div>
+          <div className="status-item">{activeFile ? getLang(activeFile) : 'Dashboard'}</div>
         </div>
       </div>
 
-      {showNewProjectModal && <NewProjectModal onClose={() => setShowNewProjectModal(false)} onCreate={handleCreateProject} />}
+      {showConfig && <SettingsModal config={{}} onClose={() => setShowConfig(false)} onSave={saveConfig} />}
     </div>
   );
 }
