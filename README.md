@@ -1,14 +1,17 @@
-# 💎 NexLab AI Framework v1.3.0
+# 💎 NexLab AI Framework v1.4.0
 
 A professional-grade, agentic AI development framework for building autonomous coding assistants and smart systems.
 
-## 🚀 Version 1.3 Highlights (NEW)
-- **Swarm Intelligence**: Configure multiple `UserAIFacade` agents (Coder, Architect, Tester) to communicate via the built-in `SwarmManager` Event Broker.
-- **Docker Sandbox Execution**: Safely execute AI-generated code inside fully isolated ephemeral `python:3.10-alpine` containers using `@export_tool`.
-- **Node Flow React Studio**: Visually drag-and-drop AI nodes and logic in our new `reactflow` designer within the GUI.
-- **AR Desktop HUD**: A sleek, glassmorphic widget overlay triggered by `nexlab gui --hud` to track real-time agent thoughts and VRAM usage straight from your desktop.
+## 🚀 Version 1.4 Highlights (NEW)
+- **Project-First Workflow**: Start by creating or opening a dedicated project workspace. All configurations and flows are now strictly scoped to your project folder.
+- **Total Control Config Editor**: Access over 200+ fine-grained parameters across LLM behavior, memory retention, component intervals, and more through a professional tabbed interface.
+- **Pro Node Orchestrator**: A fully functional visual designer where nodes represent real backend components. Execute complex swarms and monitor real-time data flow.
+- **Live Execution Stream**: Monitor agent "thoughts" and system logs via a persistent, high-fidelity terminal integrated directly into the Node Studio.
 
-## 📁 Version 1.2 Legacy Features
+## 📁 Version 1.3 Legacy Features
+- **Swarm Intelligence**: Multi-agent coordination (Coder, Architect, Tester) via `SwarmManager`.
+- **Docker Sandbox**: Secure execution of AI code inside isolated containers.
+- **AR Desktop HUD**: Sleek glassmorphic desktop overlay for real-time telemetry.
 - **Agent Packs Integration**: Ready-to-use isolated intelligent agents (e.g., `agent_packs/CoderAgent`).
 - **Local Model Loaders**: Built-in `@export_tool` classes for instant loading of `llama.cpp` (GGUF).
 
