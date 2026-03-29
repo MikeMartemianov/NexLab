@@ -19,7 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from smart_agent_arch.config_loader import ConfigLoader, FullConfig
 from smart_agent_arch.flow_executor import FlowExecutor
 
-app = FastAPI(title="NexLab AI v1.7.0 Engine")
+app = FastAPI(title="NexLab AI v1.8.0 Engine")
 
 app.add_middleware(
     CORSMiddleware,
