@@ -1,6 +1,7 @@
 import os
 import json
 import yaml
+import shutil
 from pathlib import Path
 from typing import List, Dict, Any, Optional, get_type_hints, Union
 from dataclasses import is_dataclass, asdict, fields
@@ -20,7 +21,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from smart_agent_arch.config_loader import ConfigLoader, FullConfig
 from smart_agent_arch.flow_executor import FlowExecutor
 
-app = FastAPI(title="NexLab Radiant Pro v2.0.0 Engine")
+app = FastAPI(title="NexLab Radiant Pro+ v2.1.0 Engine")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,6 +42,9 @@ state = GlobalState()
 # --- Models ---
 class ProjectOpenRequest(BaseModel):
     path: str
+
+class ProjectCreateRequest(BaseModel):
+    name: str
 
 class ConfigSaveRequest(BaseModel):
     config: Dict[str, Any]
@@ -109,7 +113,7 @@ def generate_full_schema():
 
 @app.get("/api/ping")
 async def ping():
-    return {"status": "ok", "version": "2.0.0", "theme_support": ["dark", "light"]}
+    return {"status": "ok", "version": "2.1.0", "theme_support": ["dark", "light"]}
 
 @app.get("/api/projects")
 async def list_projects():
@@ -125,6 +129,23 @@ async def list_projects():
                     "has_config": config_file.exists()
                 })
     return {"projects": projects}
+
+@app.post("/api/project/create")
+async def create_project(req: ProjectCreateRequest):
+    path = Path(os.getcwd()) / req.name
+    if path.exists():
+        raise HTTPException(status_code=400, detail="Project already exists")
+    
+    path.mkdir()
+    config_path = path / "config.yaml"
+    default_config = ConfigLoader.from_dict({"name": req.name})
+    with open(config_path, "w") as f:
+        yaml.dump(default_config.to_dict(), f)
+    
+    # Create empty flow directory
+    (path / "flows").mkdir()
+    
+    return {"status": "created", "path": str(path.absolute())}
 
 @app.post("/api/project/open")
 async def open_project(req: ProjectOpenRequest):
@@ -181,13 +202,21 @@ async def execute_flow(req: FlowExecuteRequest, background_tasks: BackgroundTask
     return {"status": "Execution started"}
 
 # ═══════════ STATIC FILES (Production) ═══════════
+# Fix for CSS pathing: serve static assets with correct MIME types
 _base = os.environ.get("NEXLAB_BASE_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 dist_path = os.path.join(_base, "frontend", "dist")
 
 if not os.path.exists(dist_path):
-    dist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
+    # Fallback to current file's relative path for dev
+    dist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
 
 if os.path.exists(dist_path):
+    # Mount assets folder explicitly to ensure correct path resolution
+    assets_path = os.path.join(dist_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+    
+    # Mount the rest of the dist folder
     app.mount("/", StaticFiles(directory=dist_path, html=True), name="frontend")
 
 def run_server(port: int = 8000):
