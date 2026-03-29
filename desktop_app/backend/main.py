@@ -2,7 +2,8 @@ import os
 import json
 import yaml
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, get_type_hints, Union
+from dataclasses import is_dataclass, asdict, fields
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -19,7 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from smart_agent_arch.config_loader import ConfigLoader, FullConfig
 from smart_agent_arch.flow_executor import FlowExecutor
 
-app = FastAPI(title="NexLab AI v1.8.0 Engine")
+app = FastAPI(title="NexLab Radiant Pro v2.0.0 Engine")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,40 +49,92 @@ class FlowExecuteRequest(BaseModel):
     nodes: List[Dict]
     edges: List[Dict]
 
+# --- Schema Generator (Massive 200+ Params) ---
+
+def generate_full_schema():
+    """Programmatically extracts all fields from FullConfig and its sub-dataclasses."""
+    from smart_agent_arch.config_loader import (
+        ModelProviderConfig, InputOutputConfig, ModelBehaviorConfig, 
+        OutputStyleConfig, MemoryConfig, MentorConfig, DeepThinkerConfig, 
+        FastMemoryConfig, RateLimitingConfig, CachingConfig, ToolsConfig, LoggingConfig
+    )
+
+    def get_params(cls):
+        params = []
+        for field in fields(cls):
+            name = field.name
+            f_type = field.type
+            
+            # Basic mapping
+            p_node = {"id": name, "label": name.replace('_', ' ').capitalize()}
+            
+            if f_type == str or f_type == Optional[str] or "str" in str(f_type):
+                p_node["type"] = "string"
+                if "api_key" in name: p_node["type"] = "password"
+            elif f_type == int or f_type == Optional[int] or "int" in str(f_type):
+                p_node["type"] = "number"
+            elif f_type == float or f_type == Optional[float] or "float" in str(f_type):
+                p_node["type"] = "range"
+                p_node["min"], p_node["max"], p_node["step"] = 0, 1, 0.1
+            elif f_type == bool or "bool" in str(f_type):
+                p_node["type"] = "boolean"
+            else:
+                p_node["type"] = "string" # Fallback
+            
+            params.append(p_node)
+        return params
+
+    return {
+        "groups": [
+            {"id": "core", "label": "System Metadata", "params": [
+                {"id": "name", "type": "string", "label": "Agent Name"},
+                {"id": "version", "type": "string", "label": "Version Tag"},
+                {"id": "description", "type": "textarea", "label": "Instruction Set"},
+            ]},
+            {"id": "provider", "label": "LLM Engine", "params": get_params(ModelProviderConfig)},
+            {"id": "behavior", "label": "Model Tuning", "params": get_params(ModelBehaviorConfig)},
+            {"id": "io", "label": "Input / Output", "params": get_params(InputOutputConfig)},
+            {"id": "style", "label": "Personality & Tone", "params": get_params(OutputStyleConfig)},
+            {"id": "memory", "label": "Long-term Memory", "params": get_params(MemoryConfig)},
+            {"id": "mentor", "label": "AI Mentor Logic", "params": get_params(MentorConfig)},
+            {"id": "thinker", "label": "Deep Thinking", "params": get_params(DeepThinkerConfig)},
+            {"id": "fast_mem", "label": "Fast Assist", "params": get_params(FastMemoryConfig)},
+            {"id": "ops", "label": "Rate Limits & Cache", "params": get_params(RateLimitingConfig) + get_params(CachingConfig)},
+            {"id": "tools", "label": "Tool Permissions", "params": get_params(ToolsConfig)},
+            {"id": "logging", "label": "Diagnostics", "params": get_params(LoggingConfig)},
+        ]
+    }
+
 # --- Endpoints ---
 
 @app.get("/api/ping")
 async def ping():
-    return {"status": "ok", "message": "NexLab AI Engine is running"}
+    return {"status": "ok", "version": "2.0.0", "theme_support": ["dark", "light"]}
 
 @app.get("/api/projects")
 async def list_projects():
-    """List potential project directories in the current folder."""
     root = Path(os.getcwd())
     projects = []
-    for d in root.iterdir():
-        if d.is_dir() and not d.name.startswith('.'):
-            config_file = d / "config.yaml"
-            projects.append({
-                "name": d.name,
-                "path": str(d.absolute()),
-                "has_config": config_file.exists()
-            })
+    if root.exists():
+        for d in root.iterdir():
+            if d.is_dir() and not d.name.startswith('.'):
+                config_file = d / "config.yaml"
+                projects.append({
+                    "name": d.name,
+                    "path": str(d.absolute()),
+                    "has_config": config_file.exists()
+                })
     return {"projects": projects}
 
 @app.post("/api/project/open")
 async def open_project(req: ProjectOpenRequest):
     path = Path(req.path)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="Project path not found")
-    
     state.workspace_root = path
     config_path = path / "config.yaml"
     
     if config_path.exists():
         state.current_config = ConfigLoader.from_yaml(config_path)
     else:
-        # Create default config if missing
         state.current_config = ConfigLoader.from_dict({"name": path.name})
         with open(config_path, "w") as f:
             yaml.dump(state.current_config.to_dict(), f)
@@ -90,55 +143,7 @@ async def open_project(req: ProjectOpenRequest):
 
 @app.get("/api/config/schema")
 async def get_config_schema():
-    """
-    Returns a flattened schema of all 200+ parameters available in FullConfig.
-    In a real implementation, this would be auto-generated from the dataclasses.
-    """
-    return {
-        "groups": [
-            {
-                "id": "core",
-                "label": "Core Settings",
-                "params": [
-                    {"id": "name", "type": "string", "label": "Agent Name", "default": "SmartAgent"},
-                    {"id": "version", "type": "string", "label": "Version", "default": "1.0"},
-                    {"id": "description", "type": "textarea", "label": "Description"},
-                ]
-            },
-            {
-                "id": "model",
-                "label": "Model & Provider",
-                "params": [
-                    {"id": "provider", "type": "select", "label": "Provider", "options": ["openai", "openrouter", "ollama", "anthropic"]},
-                    {"id": "model", "type": "string", "label": "Model ID"},
-                    {"id": "temperature", "type": "range", "label": "Temperature", "min": 0, "max": 2, "step": 0.1},
-                    {"id": "top_p", "type": "range", "label": "Top P", "min": 0, "max": 1, "step": 0.05},
-                    {"id": "api_key", "type": "password", "label": "API Key"},
-                    {"id": "base_url", "type": "string", "label": "Base URL Override"},
-                ]
-            },
-            {
-                "id": "components",
-                "label": "Intelligence Modules",
-                "params": [
-                    {"id": "mentor_enabled", "type": "boolean", "label": "Enable AI Mentor"},
-                    {"id": "mentor_interval_sec", "type": "number", "label": "Mentor Check Interval (s)"},
-                    {"id": "deep_thinker_enabled", "type": "boolean", "label": "Enable Deep Thinker"},
-                    {"id": "deep_thinker_max_iterations", "type": "number", "label": "Max Thinking Iterations"},
-                    {"id": "fast_memory_enabled", "type": "boolean", "label": "Enable Fast Memory Assist"},
-                ]
-            },
-            {
-                "id": "memory",
-                "label": "Memory & Storage",
-                "params": [
-                    {"id": "storage_backend", "type": "select", "label": "Backend", "options": ["memory", "sqlite", "redis"]},
-                    {"id": "memory_max_items", "type": "number", "label": "Max History Items"},
-                    {"id": "memory_retention_days", "type": "number", "label": "Retention Days"},
-                ]
-            }
-        ]
-    }
+    return generate_full_schema()
 
 @app.post("/api/config/save")
 async def save_config(req: ConfigSaveRequest):
@@ -151,8 +156,6 @@ async def save_config(req: ConfigSaveRequest):
     
     state.current_config = ConfigLoader.from_dict(req.config)
     return {"status": "ok"}
-
-# --- WebSockets for Logs ---
 
 @app.websocket("/api/flow/ws")
 async def flow_ws(websocket: WebSocket):
@@ -182,8 +185,7 @@ _base = os.environ.get("NEXLAB_BASE_DIR", os.path.dirname(os.path.dirname(os.pat
 dist_path = os.path.join(_base, "frontend", "dist")
 
 if not os.path.exists(dist_path):
-    # Fallback to current file's relative path for dev
-    dist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
+    dist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
 
 if os.path.exists(dist_path):
     app.mount("/", StaticFiles(directory=dist_path, html=True), name="frontend")

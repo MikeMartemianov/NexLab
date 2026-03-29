@@ -1,17 +1,13 @@
-# 💎 NexLab AI Framework v1.8.0
+# 💎 NexLab AI Framework v2.0.0 "Radiant Pro"
 
 A professional-grade, agentic AI development framework for building autonomous coding assistants and smart systems.
 
-## 🚀 Version 1.8 Highlights (NEW)
-- **PyProject Config Corrected**: Fixed invalid `__version__` field in `pyproject.toml` that caused build failures.
-- **Static Asset Pipeline Refined**: Fully automated static file routing for production React builds.
-- **Improved App Bootstrapper**: Added legacy-compatible `/api/ping` and missing `run_server` entrypoints.
-- **Pro Node Flow Engine**: Real-time visual designing with live backend node execution.
-- **Swarm Intelligence**: Multi-agent coordination (Coder, Architect, Tester) via `SwarmManager`.
-- **Docker Sandbox**: Secure execution of AI code inside isolated containers.
-- **AR Desktop HUD**: Sleek glassmorphic desktop overlay for real-time telemetry.
-- **Agent Packs Integration**: Ready-to-use isolated intelligent agents (e.g., `agent_packs/CoderAgent`).
-- **Local Model Loaders**: Built-in `@export_tool` classes for instant loading of `llama.cpp` (GGUF).
+## 🚀 Version 2.0 Highlights (NEW)
+- **Massive 200+ Parameter Suite**: Programmatic schema generation exposes Every. Single. Parameter. from the backend dataclasses (Mentor, Thinker, Memory, Caching, etc.).
+- **"Radiant Light" Premium Theme**: A stunning, glassmorphic Light Mode for maximum clarity, featuring smooth shadows and refined typography.
+- **Dynamic Orchestration Engine**: Redesigned Node Studio with live backend execution nodes and real-time telemetry.
+- **Stable Asset Pipeline**: Fixed all 404/routing issues with a robust production static asset mounter.
+- **Atomic Config Integrity**: Real-time validation of `config.yaml` changes with integrated safety checks.
 
 ## 🛠️ Quick Start
 1.  **Install**: `pip install -e .` (For perception models: `pip install -e .[advanced]`)
