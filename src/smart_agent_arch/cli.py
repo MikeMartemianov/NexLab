@@ -112,8 +112,8 @@ def update_cmd():
                     if src_file.exists():
                         shutil.copy2(src_file, project_root / item)
 
-            progress.add_task(description="Building Premium GUI...", total=None)
-            build_gui_command()
+            # Skip automatic building unless requested or version is 1.5+
+            # console.print("[dim]Skipping GUI build (use --build to force)[/dim]")
 
             progress.add_task(description="Finalizing environment...", total=None)
             subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], cwd=str(project_root), check=True, capture_output=True)
@@ -123,6 +123,17 @@ def update_cmd():
     except Exception as e:
         console.print(f"[red]❌ Update Error:[/red] {str(e)}")
         sys.exit(1)
+
+def check_version_for_build():
+    """Checks if current version warrants an skip/auto-build."""
+    try:
+        from smart_agent_arch.version import __version__
+        v_parts = [int(x) for x in __version__.split('.')]
+        # If version >= 1.5.0, we might want different behavior, 
+        # but per user request, we stop auto-build for now.
+        return v_parts >= [1, 5, 0]
+    except:
+        return False
 
 def doctor_cmd():
     """Checks environment health."""
@@ -305,7 +316,8 @@ def main():
     
     if args.command == "update":
         update_cmd()
-        if args.build:
+        # Only build if explicitly requested OR we are on version 1.5+
+        if args.build or check_version_for_build():
             build_gui_command()
     elif args.command == "doctor":
         doctor_cmd()
