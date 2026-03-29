@@ -1,13 +1,12 @@
-# 💎 NexLab AI Framework v1.6.0
+# 💎 NexLab AI Framework v1.7.0
 
 A professional-grade, agentic AI development framework for building autonomous coding assistants and smart systems.
 
-## 🚀 Version 1.6 Highlights (NEW)
-- **Advanced Multi-Project Orchestrator**: Manage multiple isolated agent projects from a single unified dashboard.
-- **Total Control Config Editor**: Access over 200+ fine-grained parameters across LLM behavior, memory retention, component intervals, and more.
-- **Pro Node Flow Engine**: A fully functional visual designer where nodes represent real backend components and actual execution logic.
-- **Live WebSocket Execution Stream**: Real-time telemetry and agent logging integrated directly into the Node Studio.
-- **Stable Backend Launcher**: Fixed startup sequence and inter-process communication for seamless app booting.
+## 🚀 Version 1.7 Highlights (NEW)
+- **Static Asset Pipeline Refined**: Fixed 404 errors by correctly mounting React production builds in the FastAPI backend.
+- **Improved App Bootstrapper**: Added legacy-compatible `/api/ping` and missing `run_server` entrypoints to ensure 100% startup success.
+- **Advanced Multi-Project Orchestrator**: Seamless project switching and workspace isolation from the new dashboard.
+- **Pro Node Flow Engine**: Real-time visual designing with live backend node execution nodes.
 - **Swarm Intelligence**: Multi-agent coordination (Coder, Architect, Tester) via `SwarmManager`.
 - **Docker Sandbox**: Secure execution of AI code inside isolated containers.
 - **AR Desktop HUD**: Sleek glassmorphic desktop overlay for real-time telemetry.

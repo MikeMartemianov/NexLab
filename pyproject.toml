@@ -4,8 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-agent-arch"
-version = "1.6.0"
-description = "NexLab AI Framework 1.6.0 - Advanced Multi-Project Orchestrator and Visual Flow Engine."
+version = "1.7.0"
+__version__ = "1.7.0"
+description = "NexLab AI Framework 1.7.0 - Ultra-Fast Project Orchestrator, Node Execution logic, and Static Asset Routing Fix."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import asyncio
 import logging
@@ -18,7 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from smart_agent_arch.config_loader import ConfigLoader, FullConfig
 from smart_agent_arch.flow_executor import FlowExecutor
 
-app = FastAPI(title="NexLab AI v1.6.0 Engine")
+app = FastAPI(title="NexLab AI v1.7.0 Engine")
 
 app.add_middleware(
     CORSMiddleware,
@@ -175,6 +176,17 @@ async def execute_flow(req: FlowExecuteRequest, background_tasks: BackgroundTask
     state.active_executor = executor
     background_tasks.add_task(executor.execute)
     return {"status": "Execution started"}
+
+# ═══════════ STATIC FILES (Production) ═══════════
+_base = os.environ.get("NEXLAB_BASE_DIR", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+dist_path = os.path.join(_base, "frontend", "dist")
+
+if not os.path.exists(dist_path):
+    # Fallback to current file's relative path for dev
+    dist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "dist")
+
+if os.path.exists(dist_path):
+    app.mount("/", StaticFiles(directory=dist_path, html=True), name="frontend")
 
 def run_server(port: int = 8000):
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
