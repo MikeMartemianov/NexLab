@@ -129,9 +129,9 @@ def check_version_for_build():
     try:
         from smart_agent_arch.version import __version__
         v_parts = [int(x) for x in __version__.split('.')]
-        # If version >= 1.5.0, we might want different behavior, 
-        # but per user request, we stop auto-build for now.
-        return v_parts >= [1, 5, 0]
+        # Never auto-build during update unless --build is passed.
+        # This gives full control to the user.
+        return False
     except:
         return False
 
