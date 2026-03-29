@@ -1,23 +1,23 @@
-"""NexLab AI Code Editor - Full Backend API."""
-
 import os
-import sys
-import subprocess
-import shutil
+import json
+import yaml
 from pathlib import Path
-from typing import Any
-
-import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks
-from fastapi.staticfiles import StaticFiles
+from typing import List, Dict, Any, Optional
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import asyncio
+import logging
 
-# Add project root to path so smart_agent_arch is importable
+# Ensure project root is in path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+import sys
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-app = FastAPI(title="NexLab AI Editor Backend")
+from smart_agent_arch.config_loader import ConfigLoader, FullConfig
+from smart_agent_arch.flow_executor import FlowExecutor
+
+app = FastAPI(title="NexLab AI v1.4.0 Engine")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,556 +27,150 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ═══════════ GLOBAL STATE  ═══════════
-WORKSPACE_ROOT = str(PROJECT_ROOT)
-SYSTEM_CONFIG_FILE = Path(WORKSPACE_ROOT) / ".nexlab_system_config.yaml"
-_ai_facade = None
+# --- State ---
+class GlobalState:
+    workspace_root: Optional[Path] = None
+    current_config: Optional[FullConfig] = None
+    active_executor: Optional[FlowExecutor] = None
 
-def _load_system_config():
-    if SYSTEM_CONFIG_FILE.exists():
-        try:
-            import yaml
-            with open(SYSTEM_CONFIG_FILE, "r", encoding="utf-8") as f:
-                return yaml.safe_load(f) or {}
-        except Exception:
-            pass
-    return {
-        "provider": "openai",
-        "model": "gpt-4o",
-        "api_key": "",
-        "base_url": "",
-        "temperature": 0.7,
-        "mentorEnabled": True,
-        "deepThinkerEnabled": True,
-    }
+state = GlobalState()
 
-def _save_system_config(cfg):
-    try:
-        import yaml
-        with open(SYSTEM_CONFIG_FILE, "w", encoding="utf-8") as f:
-            yaml.dump(cfg, f)
-    except Exception:
-        pass
-
-_current_agent_config = _load_system_config()
-
-def _get_ai():
-    global _ai_facade
-    if _ai_facade is None:
-        try:
-            from smart_agent_arch.user_api import UserAIFacade
-            config_dict = {
-                "provider": _current_agent_config.get("provider", "openai"),
-                "model": _current_agent_config.get("model", "gpt-4o"),
-                "api_key": _current_agent_config.get("api_key", ""),
-                "base_url": _current_agent_config.get("base_url", ""),
-                "temperature": _current_agent_config.get("temperature", 0.7),
-                "system_prompts": {
-                    "first_ai": (
-                        "You are the internal NexLab Code Editor AI Assistant.\n"
-                        "You have full access to the file system and project structure via your injected tools.\n"
-                        "You can create new files (create_file), read files (read_project_file), and execute terminal commands (execute_terminal).\n"
-                        "Your primary expertise is the `smart_agent_arch` framework.\n"
-                        "To build an agent project, the simplest script is:\n"
-                        "```python\n"
-                        "from smart_agent_arch import initialize_ai\n"
-                        "ai = initialize_ai()\n"
-                        "print(ai.send_text('Hello').content)\n"
-                        "```\n"
-                        "The library is downloaded automatically via `requirements.txt` containing `git+https://github.com/MikeMartemianov/NexLab.git` whenever the user clicks Run.\n"
-                        "Be extremely proactive: if the user asks you to create a project, do not tell them how to do it - USE YOUR TOOLS to create the folders, the `main.py`, and the `requirements.txt` directly, and then tell them to press Run!"
-                    )
-                }
-            }
-            # Remove empty strings to not break validators
-            if not config_dict["api_key"]: config_dict.pop("api_key", None)
-            if not config_dict["base_url"]: config_dict.pop("base_url", None)
-            
-            _ai_facade = UserAIFacade(config=config_dict)
-        except Exception as e:
-            print(f"Failed to auto-init facade: {e}")
-            _ai_facade = None
-    return _ai_facade
-
-# ═══════════ MODELS ═══════════
-class FileCreateRequest(BaseModel):
-    path: str
-    type: str = "file"
-
-
-class FileSaveRequest(BaseModel):
-    path: str
-    content: str
-
-
-class FileDeleteRequest(BaseModel):
+# --- Models ---
+class ProjectOpenRequest(BaseModel):
     path: str
 
-
-class FileRenameRequest(BaseModel):
-    path: str
-    newName: str
-
-
-class TerminalExecRequest(BaseModel):
-    command: str
-
-
-class ProjectCreateRequest(BaseModel):
-    path: str
-    name: str
-    config: dict = {}
-
-class ProjectRunRequest(BaseModel):
-    script_path: str = "main.py"
-
-
-class ProjectStatsResponse(BaseModel):
-    fileCount: int
-    dirCount: int
-    totalSize: int
-
-
-class ChatRequest(BaseModel):
-    message: str
-    context: dict = {}
-
-
-class AgentConfigRequest(BaseModel):
-    provider: str = "ollama"
-    model: str = "llama3"
-    api_key: str = ""
-    base_url: str = ""
-    temperature: float = 0.7
-    mentorEnabled: bool = True
-    deepThinkerEnabled: bool = True
-    mentorInterval: int = 5
-    maxResponseLength: int = 4096
-    tools: dict = {}
-
+class ConfigSaveRequest(BaseModel):
+    config: Dict[str, Any]
 
 class FlowExecuteRequest(BaseModel):
-    nodes: list[dict]
-    edges: list[dict]
+    nodes: List[Dict]
+    edges: List[Dict]
 
+# --- Endpoints ---
 
-# ═══════════ PING ═══════════
-@app.get("/api/ping")
-def ping():
-    return {"status": "ok", "message": "NexLab AI Editor Backend is running"}
-
-
-# ═══════════ FILE SYSTEM ═══════════
-def _scan_dir(dir_path: str, max_depth: int = 5, current_depth: int = 0) -> list[dict]:
-    """Recursively scan a directory tree."""
-    if current_depth >= max_depth:
-        return []
-
-    items = []
-    try:
-        entries = sorted(os.listdir(dir_path), key=lambda x: (not os.path.isdir(os.path.join(dir_path, x)), x.lower()))
-    except PermissionError:
-        return []
-
-    skip_dirs = {'.git', 'node_modules', '__pycache__', '.venv', 'venv', '.mypy_cache',
-                 '.pytest_cache', 'dist', 'build', '.egg-info', '.tox', '.idea', '.vscode'}
-
-    for entry in entries:
-        if entry.startswith('.') and entry not in {'.gitignore', '.env'}:
-            continue
-
-        full_path = os.path.join(dir_path, entry)
-        rel_path = os.path.relpath(full_path, WORKSPACE_ROOT).replace('\\', '/')
-
-        if os.path.isdir(full_path):
-            if entry in skip_dirs:
-                continue
-            children = _scan_dir(full_path, max_depth, current_depth + 1)
-            items.append({
-                "name": entry,
-                "path": "/" + rel_path,
-                "type": "directory",
-                "children": children,
+@app.get("/api/projects")
+async def list_projects():
+    """List potential project directories in the current folder."""
+    root = Path(os.getcwd())
+    projects = []
+    for d in root.iterdir():
+        if d.is_dir() and not d.name.startswith('.'):
+            config_file = d / "config.yaml"
+            projects.append({
+                "name": d.name,
+                "path": str(d.absolute()),
+                "has_config": config_file.exists()
             })
-        else:
-            items.append({
-                "name": entry,
-                "path": "/" + rel_path,
-                "type": "file",
-            })
-    return items
+    return {"projects": projects}
 
-
-@app.get("/api/files")
-def list_files():
-    """Return the workspace file tree."""
-    return {"files": _scan_dir(WORKSPACE_ROOT)}
-
-
-@app.get("/api/file")
-def read_file(path: str):
-    """Read file content."""
-    full_path = os.path.join(WORKSPACE_ROOT, path.lstrip("/"))
-    if not os.path.isfile(full_path):
-        return {"error": "File not found", "content": ""}
-
-    try:
-        with open(full_path, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read()
-        return {"content": content}
-    except Exception as e:
-        return {"error": str(e), "content": ""}
-
-
-@app.post("/api/file/save")
-def save_file(req: FileSaveRequest):
-    """Save content to a file."""
-    full_path = os.path.join(WORKSPACE_ROOT, req.path.lstrip("/"))
-    try:
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, "w", encoding="utf-8") as f:
-            f.write(req.content)
-        return {"status": "ok"}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-
-@app.post("/api/file/create")
-def create_file(req: FileCreateRequest):
-    """Create a new file or directory."""
-    full_path = os.path.join(WORKSPACE_ROOT, req.path.lstrip("/"))
-    try:
-        if req.type == "directory":
-            os.makedirs(full_path, exist_ok=True)
-        else:
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            with open(full_path, "w", encoding="utf-8") as f:
-                f.write("")
-        return {"status": "ok"}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-# ═══════════ NODE FLOW STUDIO ═══════════
-@app.post("/api/flow/execute")
-def execute_flow(req: FlowExecuteRequest, background_tasks: BackgroundTasks):
-    """
-    Simulates parsing the React Flow node graph and instantiating 
-    the Swarm / Docker architecture based on the visual layout.
-    """
-    def _run_flow(nodes, edges):
-        import time
-        from smart_agent_arch import initialize_ai
-        from smart_agent_arch.swarm_manager import get_swarm
-        from smart_agent_arch.components.docker_sandbox import execute_secure_script
-        
-        # In a real scenario, this iterates the DAG tree.
-        logger = logging.getLogger("flow_executor")
-        logger.info(f"Executing Flow with {len(nodes)} nodes and {len(edges)} edges")
-        time.sleep(2)
-        logger.info("Pipeline Complete")
-
-    background_tasks.add_task(_run_flow, req.nodes, req.edges)
-    return {"status": "Pipeline execution started in background"}
-
-@app.post("/api/file/delete")
-def delete_file(req: FileDeleteRequest):
-    """Delete a file or directory."""
-    full_path = os.path.join(WORKSPACE_ROOT, req.path.lstrip("/"))
-    try:
-        if os.path.isdir(full_path):
-            shutil.rmtree(full_path)
-        elif os.path.isfile(full_path):
-            os.remove(full_path)
-        return {"status": "ok"}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-
-@app.post("/api/file/rename")
-def rename_file(req: FileRenameRequest):
-    """Rename a file or directory."""
-    full_path = os.path.join(WORKSPACE_ROOT, req.path.lstrip("/"))
-    parent = os.path.dirname(full_path)
-    new_path = os.path.join(parent, req.newName)
-    try:
-        os.rename(full_path, new_path)
-        return {"status": "ok"}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-
-@app.post("/api/project/create")
-def create_new_project(req: ProjectCreateRequest):
-    """Scaffold a new agent project directory."""
-    try:
-        target_path = Path(req.path).resolve()
-        target_path.mkdir(parents=True, exist_ok=True)
-
-        config_path = target_path / "config.yaml"
-        if not config_path.exists():
-            import yaml
-            # Default fallback if empty
-            cfg_data = req.config if req.config else {
-                "name": req.name,
-                "provider": "openai",
-                "model": "gpt-4o",
-                "temperature": 0.7,
-                "mentor_enabled": True,
-                "deep_thinker_enabled": True
-            }
-            with open(config_path, "w", encoding="utf-8") as f:
-                yaml.dump(cfg_data, f, default_flow_style=False, sort_keys=False)
-
-        req_path = target_path / "requirements.txt"
-        if not req_path.exists():
-            with open(req_path, "w", encoding="utf-8") as f:
-                f.write("git+https://github.com/MikeMartemianov/NexLab.git\n")
-
-        main_path = target_path / "main.py"
-        if not main_path.exists():
-            with open(main_path, "w", encoding="utf-8") as f:
-                f.write(f"""from smart_agent_arch import initialize_ai
-
-def main():
-    print("Starting NexLab Agent: {req.name}")
-    ai = initialize_ai()
-    response = ai.send_text("Hello, who are you?")
-    print(f"Agent: {{response.content}}")
-
-if __name__ == "__main__":
-    main()
-""")
-
-        return {"status": "ok", "message": f"Project '{req.name}' created at {target_path}"}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-
-@app.get("/api/project/stats")
-def get_project_stats():
-    """Return interesting statistics about the current project."""
-    try:
-        file_count = 0
-        total_size = 0
-        for root, dirs, files in os.walk(WORKSPACE_ROOT):
-            # Skip hidden and large dirs
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('node_modules', '__pycache__')]
-            for f in files:
-                file_count += 1
-                total_size += os.path.getsize(os.path.join(root, f))
-        
-        return {
-            "fileCount": file_count,
-            "totalSizeKb": round(total_size / 1024, 1),
-            "projectName": os.path.basename(WORKSPACE_ROOT),
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-@app.post("/api/project/run")
-def run_project(req: ProjectRunRequest):
-    """Run the agent's main script in a background process."""
-    try:
-        script = os.path.join(WORKSPACE_ROOT, req.script_path.lstrip("/"))
-        if not os.path.isfile(script):
-            return {"status": "error", "error": f"Script not found: {script}"}
+@app.post("/api/project/open")
+async def open_project(req: ProjectOpenRequest):
+    path = Path(req.path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Project path not found")
+    
+    state.workspace_root = path
+    config_path = path / "config.yaml"
+    
+    if config_path.exists():
+        state.current_config = ConfigLoader.from_yaml(config_path)
+    else:
+        # Create default config if missing
+        state.current_config = ConfigLoader.from_dict({"name": path.name})
+        with open(config_path, "w") as f:
+            yaml.dump(state.current_config.to_dict(), f)
             
-        script_dir = os.path.dirname(script)
-        
-        # 1. Auto-install dependencies if requirements.txt exists
-        req_path = os.path.join(script_dir, "requirements.txt")
-        install_log = ""
-        if os.path.isfile(req_path):
-            install_log = "Installing dependencies (NexLab GitHub Library)...\n"
-            try:
-                install_proc = subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
-                    cwd=script_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=90
-                )
-                install_log += install_proc.stdout + "\n"
-                if install_proc.stderr:
-                    install_log += f"Errors:\n{install_proc.stderr}\n"
-            except Exception as e:
-                install_log += f"PIP Failed: {e}\n"
+    return {"status": "ok", "config": state.current_config.to_dict()}
 
-        # 2. Run the actual agent script
-        proc = subprocess.Popen(
-            [sys.executable, script],
-            cwd=script_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
-        )
-        return {"status": "ok", "message": f"{install_log}\nSuccessfully started {req.script_path} (PID: {proc.pid})"}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-
-# ═══════════ TERMINAL ═══════════
-@app.post("/api/terminal/exec")
-def terminal_exec(req: TerminalExecRequest):
-    """Execute a terminal command and return output."""
-    try:
-        result = subprocess.run(
-            req.command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            cwd=WORKSPACE_ROOT,
-        )
-        output = result.stdout
-        if result.stderr:
-            output += "\n" + result.stderr
-        return {"output": output.strip()}
-    except subprocess.TimeoutExpired:
-        return {"output": "[Command timed out after 30s]"}
-    except Exception as e:
-        return {"output": f"[Error: {e}]"}
-
-
-# ═══════════ AI CHAT ═══════════
-@app.post("/api/chat")
-def chat(req: ChatRequest):
-    """Process a chat message through the AI facade."""
-    ai = _get_ai()
-
-    if ai is None:
-        # Fallback: simple echo when AI is not configured
-        return {
-            "reply": (
-                f"I received your message: \"{req.message[:100]}\".\n\n"
-                "⚠️ The AI backend (smart-agent-arch) is initializing. "
-                "Please configure a valid model provider in Agent Studio."
-            ),
-            "thinking": "Checking AI backend availability...",
-        }
-
-    try:
-        response = ai.send_text(req.message)
-        context = ai.runtime_context()
-
-        thinking = None
-        thinker_insights = context.get("thinker_insights", [])
-        if thinker_insights:
-            thinking = thinker_insights[-1]
-
-        return {
-            "reply": response.content if response else "No response generated.",
-            "thinking": thinking,
-        }
-    except Exception as e:
-        return {
-            "reply": f"⚠️ AI Error: {str(e)}",
-            "thinking": "An error occurred during processing.",
-        }
-
-
-# ═══════════ AGENT CONFIGURATION ═══════════
-@app.get("/api/agent/config")
-def get_agent_config():
-    return _current_agent_config
-
-@app.post("/api/agent/configure")
-def configure_agent(req: AgentConfigRequest):
-    """Reconfigure the AI facade with new settings."""
-    global _ai_facade, _current_agent_config
-    try:
-        from smart_agent_arch.user_api import UserAIFacade
-
-        _current_agent_config = {
-            "provider": req.provider,
-            "model": req.model,
-            "api_key": req.api_key,
-            "base_url": req.base_url,
-            "temperature": req.temperature,
-            "mentorEnabled": req.mentorEnabled,
-            "deepThinkerEnabled": req.deepThinkerEnabled,
-        }
-
-        config_dict: dict[str, Any] = {
-            "provider": req.provider,
-            "model": req.model,
-            "api_key": req.api_key,
-            "base_url": req.base_url,
-            "temperature": req.temperature,
-            "mentor_enabled": req.mentorEnabled,
-            "deep_thinker_enabled": req.deepThinkerEnabled,
-            "mentor_interval_sec": req.mentorInterval,
-            "max_response_length": req.maxResponseLength,
-        }
-        
-        # Remove empty fields so we don't accidentally override FullConfig
-        if not config_dict.get("api_key"): config_dict.pop("api_key", None)
-        if not config_dict.get("base_url"): config_dict.pop("base_url", None)
-
-        _save_system_config(_current_agent_config)
-
-        # Stop existing facade
-        if _ai_facade:
-            try:
-                _ai_facade.stop()
-            except Exception:
-                pass
-
-        _ai_facade = UserAIFacade(config=config_dict)
-        return {"status": "ok", "message": "Agent reconfigured successfully"}
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-
-@app.get("/api/agent/diagnostics")
-def get_diagnostics(n: int = 30):
-    """Return recent diagnostic events."""
-    ai = _get_ai()
-    if not ai:
-        return {"events": []}
-    return {"events": ai.diagnostics(last_n=n)}
-
-
-@app.get("/api/agent/tools")
-def get_tools():
-    """Return currently registered tools."""
-    ai = _get_ai()
-    if not ai:
-        return {"tools": []}
-    # UserAIFacade has _command_parser.describe()
-    context = ai.runtime_context()
-    return {"tools": context.get("command_parser", {}).get("commands", [])}
-
-
-@app.get("/api/agent/status")
-def get_status():
-    """Return high-level agent status."""
-    ai = _get_ai()
-    if not ai:
-        return {"state": "uninitialized"}
-    context = ai.runtime_context()
+@app.get("/api/config/schema")
+async def get_config_schema():
+    """
+    Returns a flattened schema of all 200+ parameters available in FullConfig.
+    In a real implementation, this would be auto-generated from the dataclasses.
+    """
     return {
-        "state": context.get("runtime_state"),
-        "mentor_state": context.get("mentor_state"),
-        "deep_thinker_state": context.get("deep_thinker_state"),
-        "version": "1.0.0"
+        "groups": [
+            {
+                "id": "core",
+                "label": "Core Settings",
+                "params": [
+                    {"id": "name", "type": "string", "label": "Agent Name", "default": "SmartAgent"},
+                    {"id": "version", "type": "string", "label": "Version", "default": "1.0"},
+                    {"id": "description", "type": "textarea", "label": "Description"},
+                ]
+            },
+            {
+                "id": "model",
+                "label": "Model & Provider",
+                "params": [
+                    {"id": "provider", "type": "select", "label": "Provider", "options": ["openai", "openrouter", "ollama", "anthropic"]},
+                    {"id": "model", "type": "string", "label": "Model ID"},
+                    {"id": "temperature", "type": "range", "label": "Temperature", "min": 0, "max": 2, "step": 0.1},
+                    {"id": "top_p", "type": "range", "label": "Top P", "min": 0, "max": 1, "step": 0.05},
+                    {"id": "api_key", "type": "password", "label": "API Key"},
+                    {"id": "base_url", "type": "string", "label": "Base URL Override"},
+                ]
+            },
+            {
+                "id": "components",
+                "label": "Intelligence Modules",
+                "params": [
+                    {"id": "mentor_enabled", "type": "boolean", "label": "Enable AI Mentor"},
+                    {"id": "mentor_interval_sec", "type": "number", "label": "Mentor Check Interval (s)"},
+                    {"id": "deep_thinker_enabled", "type": "boolean", "label": "Enable Deep Thinker"},
+                    {"id": "deep_thinker_max_iterations", "type": "number", "label": "Max Thinking Iterations"},
+                    {"id": "fast_memory_enabled", "type": "boolean", "label": "Enable Fast Memory Assist"},
+                ]
+            },
+            {
+                "id": "memory",
+                "label": "Memory & Storage",
+                "params": [
+                    {"id": "storage_backend", "type": "select", "label": "Backend", "options": ["memory", "sqlite", "redis"]},
+                    {"id": "memory_max_items", "type": "number", "label": "Max History Items"},
+                    {"id": "memory_retention_days", "type": "number", "label": "Retention Days"},
+                ]
+            }
+        ]
     }
 
+@app.post("/api/config/save")
+async def save_config(req: ConfigSaveRequest):
+    if not state.workspace_root:
+        raise HTTPException(status_code=400, detail="No active project")
+    
+    config_path = state.workspace_root / "config.yaml"
+    with open(config_path, "w") as f:
+        yaml.dump(req.config, f)
+    
+    state.current_config = ConfigLoader.from_dict(req.config)
+    return {"status": "ok"}
 
-# ═══════════ STATIC FILES (Production) ═══════════
-# In PyInstaller frozen mode, the dist folder is bundled relative to _MEIPASS
-_base = os.environ.get("NEXLAB_BASE_DIR", os.path.join(os.path.dirname(__file__), ".."))
-dist_path = os.path.join(_base, "desktop_app", "frontend", "dist")
-if not os.path.exists(dist_path):
-    # Fallback: dev mode relative path
-    dist_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
-if os.path.exists(dist_path):
-    app.mount("/", StaticFiles(directory=dist_path, html=True), name="frontend")
+# --- WebSockets for Logs ---
 
+@app.websocket("/api/flow/ws")
+async def flow_ws(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            if state.active_executor:
+                log = await state.active_executor.log_queue.get()
+                await websocket.send_json(log)
+            else:
+                await asyncio.sleep(0.5)
+    except WebSocketDisconnect:
+        pass
 
-def run_server(port: int = 8000):
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
-
+@app.post("/api/flow/execute")
+async def execute_flow(req: FlowExecuteRequest, background_tasks: BackgroundTasks):
+    if not state.workspace_root:
+        raise HTTPException(status_code=400, detail="No active project")
+    
+    executor = FlowExecutor(req.nodes, req.edges, state.current_config.to_dict())
+    state.active_executor = executor
+    background_tasks.add_task(executor.execute)
+    return {"status": "Execution started"}
 
 if __name__ == "__main__":
-    run_server()
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
