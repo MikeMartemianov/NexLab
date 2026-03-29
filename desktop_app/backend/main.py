@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import asyncio
 import logging
+import uvicorn
 
 # Ensure project root is in path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -17,7 +18,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from smart_agent_arch.config_loader import ConfigLoader, FullConfig
 from smart_agent_arch.flow_executor import FlowExecutor
 
-app = FastAPI(title="NexLab AI v1.4.0 Engine")
+app = FastAPI(title="NexLab AI v1.6.0 Engine")
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,6 +48,10 @@ class FlowExecuteRequest(BaseModel):
     edges: List[Dict]
 
 # --- Endpoints ---
+
+@app.get("/api/ping")
+async def ping():
+    return {"status": "ok", "message": "NexLab AI Engine is running"}
 
 @app.get("/api/projects")
 async def list_projects():
@@ -171,6 +176,8 @@ async def execute_flow(req: FlowExecuteRequest, background_tasks: BackgroundTask
     background_tasks.add_task(executor.execute)
     return {"status": "Execution started"}
 
+def run_server(port: int = 8000):
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
+
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    run_server()
